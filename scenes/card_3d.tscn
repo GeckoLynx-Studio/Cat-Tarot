@@ -1,0 +1,52 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/card_3d.gd" id="1_card"]
+[ext_resource type="Texture2D" path="res://assets/icons/cat.png" id="2_cat"]
+
+[sub_resource type="QuadMesh" id="Quad_front"]
+size = Vector2(1.5, 2.5)
+
+[sub_resource type="QuadMesh" id="Quad_back"]
+size = Vector2(1.5, 2.5)
+
+[sub_resource type="StandardMaterial3D" id="Mat_back"]
+albedo_color = Color(0.29, 0.14, 0.3, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="Mat_back_icon"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 1, 1, 0.95)
+albedo_texture = ExtResource("2_cat")
+
+[sub_resource type="QuadMesh" id="Quad_back_icon"]
+size = Vector2(0.72, 0.72)
+
+[sub_resource type="BoxShape3D" id="Shape_card"]
+size = Vector3(1.5, 2.5, 0.08)
+
+[node name="Card3D" type="Node3D"]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+script = ExtResource("1_card")
+
+[node name="Front" type="MeshInstance3D" parent="."]
+mesh = SubResource("Quad_front")
+cast_shadow = 1
+
+[node name="Back" type="MeshInstance3D" parent="."]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, -0.02)
+mesh = SubResource("Quad_back")
+material_override = SubResource("Mat_back")
+cast_shadow = 0
+
+[node name="BackIcon" type="MeshInstance3D" parent="Back"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.001)
+mesh = SubResource("Quad_back_icon")
+material_override = SubResource("Mat_back_icon")
+cast_shadow = 0
+
+[node name="Area3D" type="Area3D" parent="."]
+input_ray_pickable = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D"]
+shape = SubResource("Shape_card")

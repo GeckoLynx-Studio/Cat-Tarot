@@ -1,0 +1,33 @@
+# Raw assets are not tracked; only assets.tar.gz is committed
+/assets/
+
+# Godot
+.godot/
+.import/
+*.translation
+export_credentials.cfg
+.mono/
+data_*/
+mono_crash.*.json
+
+# Build output
+/build/
+/export/
+*.pck
+*.x86_64
+*.exe
+*.apk
+*.aab
+*.dmg
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
+
+# Python (authoring tools)
+__pycache__/
+*.pyc
