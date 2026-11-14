@@ -50,6 +50,7 @@ var selected: bool = false
 var dimmed: bool = false
 var hovered: bool = false
 var animation_locked: bool = false
+var is_reversed: bool = false
 
 var _material: StandardMaterial3D
 var _base_color: Color = Color.WHITE
@@ -317,6 +318,7 @@ func set_dimmed(value: bool) -> void:
 
 
 func show_reversed(value: bool, animate: bool = true) -> void:
+	is_reversed = value
 	if _flip_tween != null and _flip_tween.is_valid():
 		_flip_tween.kill()
 	var target := PI if value else 0.0
@@ -327,8 +329,8 @@ func show_reversed(value: bool, animate: bool = true) -> void:
 	_flip_tween = create_tween()
 	_flip_tween.set_parallel(true)
 	_flip_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	_flip_tween.tween_property(front, "rotation:z", target, 0.35)
-	_flip_tween.tween_property(back, "rotation:z", target, 0.35)
+	_flip_tween.tween_property(front, "rotation:z", target, 0.32)
+	_flip_tween.tween_property(back, "rotation:z", target, 0.32)
 
 
 func refresh_language() -> void:

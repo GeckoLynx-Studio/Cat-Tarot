@@ -9,6 +9,7 @@ config/features=PackedStringArray("4.6")
 
 [autoload]
 
+Audio="*res://scripts/audio_manager.gd"
 Loc="*res://scripts/loc.gd"
 GameManager="*res://scripts/game_manager.gd"
 

@@ -96,11 +96,11 @@ func roll_to(value: int) -> void:
 	var target_rotation := (Quaternion(Vector3.UP, yaw) * align).get_euler()
 	_spin_tween = create_tween()
 	_spin_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	_spin_tween.tween_property(pivot, "rotation", target_rotation + Vector3(TAU * 2.0, TAU * 2.0, TAU * 2.0), 0.85)
+	_spin_tween.tween_property(pivot, "rotation", target_rotation + Vector3(TAU * 2.0, TAU * 2.0, TAU * 2.0), 0.78)
 	_hop_tween = create_tween()
 	_hop_tween.set_trans(Tween.TRANS_QUAD)
-	_hop_tween.tween_property(pivot, "position", Vector3(0.0, 0.38, 0.0), 0.32).set_ease(Tween.EASE_OUT)
-	_hop_tween.tween_property(pivot, "position", Vector3.ZERO, 0.53).set_ease(Tween.EASE_IN)
+	_hop_tween.tween_property(pivot, "position", Vector3(0.0, 0.38, 0.0), 0.30).set_ease(Tween.EASE_OUT)
+	_hop_tween.tween_property(pivot, "position", Vector3.ZERO, 0.48).set_ease(Tween.EASE_IN)
 	_spin_tween.finished.connect(func() -> void:
 		if current_id != _roll_id:
 			return

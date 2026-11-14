@@ -1,8 +1,9 @@
 # Cat-Tarot
 
 A single-player semi-top-down 3D tarot roguelike for Godot 4.x. One run is a
-linear sequence of 21 card choices. The UI is bilingual (简体中文 / English) and
-uses the supplied cute font `乐米栀夏浅风体`.
+linear sequence of 21 card choices. The UI is bilingual (简体中文 / English; the
+language is set in `Loc`, with no in-game toggle) and uses the supplied cute font
+`乐米栀夏浅风体`.
 
 The current rule set is the four-stat "Cat's Scales" version. There are no acts,
 no Will/HP/Intuition/Debt resources, no debt settlement, and no active mark
@@ -29,8 +30,8 @@ Debug seed:
 godot --path . -- --seed=1234
 ```
 
-The seed is shown in the restart tooltip. The restart icon starts a new random
-run. `R` restarts with the command-line seed.
+The tabletop restart button starts a new random run. `R` restarts with the
+command-line seed.
 
 ## Four stats
 
@@ -42,9 +43,10 @@ All four stats start at **4**. The safe range is **1-9**. If any stat becomes
 - 好奇 / Curiosity (star icon)
 - 安逸 / Comfort (leaf icon)
 
-The top bar shows a value and a small bar for each stat. Values near a boundary
-are highlighted. A `-1` effect is applied as a minus-one delta; it is not a
-`< 1` condition and is not clamped to a minimum of 1.
+The top bar contains only the cat avatar and the four stats, each with a value
+and a small bar. Values near a boundary are highlighted. There is no progress
+counter, phase label, or language toggle. A `-1` effect is applied as a
+minus-one delta; it is not a `< 1` condition and is not clamped to a minimum of 1.
 
 Die-face costs:
 
@@ -115,8 +117,8 @@ opening cards already show the orientations for that face.
 ### Death
 
 If any stat reaches `<= 0` or `>= 10`, the run ends immediately. There is no
-inheritance, no stat reset, and no mark loss. The end screen shows the death
-reason, the current stats, and the number of resolved choices.
+inheritance, no stat reset, and no mark loss. No end panel appears; the restart
+button on the table lights up with a pulsing halo instead.
 
 The d6/pip rolls are seeded. The final-trial missing-mark rule is intentionally
 skipped in this build.
@@ -160,10 +162,11 @@ because the final trial is currently skipped.
 
 ## Final World
 
-After 21 choices, The World card is shown and the run ends directly. This is an
-intentional simplification: the final interpretation / Judgement check / missing
-mark payment is not executed in this build. The end screen shows the four stats,
-mark count, and choices resolved.
+After 21 choices, The World card is drawn from the deck with the normal draw and
+entry animation; once it leaves the pile, the draw pile disappears. The run then
+ends directly. This is an intentional simplification: the final interpretation /
+Judgement check / missing mark payment is not executed in this build. No end
+panel appears; the tabletop restart button lights up with a pulsing halo.
 
 ## Assets and icons
 
@@ -172,11 +175,25 @@ mark count, and choices resolved.
 - The Chinese UI font is `assets/fonts/lemi_zhixia_qianfeng.ttf`.
 - The 3D die is exported from the supplied `DiceLowPoly.blend` to
   `assets/models/dice_low_poly.glb`.
+- Card and dice sounds are under `assets/audio/sfx/`, converted from the supplied
+  tabletop sound pack to 16-bit PCM so Godot can import them.
+- The looping background track is `assets/audio/music/tarot_ambience.ogg`, an
+  original ambient piece composed for this project.
 - Source/license notes are in `assets/LICENSES.md`.
 
 Stat icon mapping: fire = Passion, eye = Intuition, star = Curiosity, leaf =
 Comfort. Effects use signed numbers; positive and negative deltas use green/red
 values, while the stat icon keeps the stat color.
+
+## Audio
+
+`Audio` (autoload in `scripts/audio_manager.gd`) creates dedicated `Music` and
+`SFX` buses at runtime. Card draws, flips, taps, discards, hand placement, die
+rolls, and the World reveal each use a tabletop sound effect with slight random
+pitch variation. The 64-second ambient loop fades in when a run
+starts and restarts with every new run. `Audio.play_sfx(key, volume_db, pitch)`
+is the only call sites need; unknown keys are ignored so a missing asset cannot
+break gameplay.
 
 ## Project structure
 
@@ -189,12 +206,16 @@ Cat-Tarot/
 |   |-- icons/                 supplied no-padding icons
 |   |-- fonts/                 cute Chinese UI font
 |   |-- models/                GLB die + original blend source
+|   |-- audio/
+|   |   |-- sfx/               card, deck, and dice WAV effects
+|   |   `-- music/             looping ambient background track
 |   `-- LICENSES.md
 |-- assets.tar.gz
 |-- scenes/
 |   |-- main.tscn              table, camera, die, draw pile, UI layer
 |   |-- card_3d.tscn           flat card + 3D effect/action overlays
 |   |-- dice_3d.tscn           low-poly 3D die
+|   |-- restart_button_3d.tscn tabletop restart button + halo
 |   `-- deck_3d.tscn           22-card draw pile and flip source
 |-- scripts/
 |   |-- card_database.gd       structured 21-card data
@@ -203,7 +224,9 @@ Cat-Tarot/
 |   |-- card_3d.gd             texture, hover, selection, reversal, effect/action overlays
 |   |-- dice_3d.gd             d6 face and tumble animation
 |   |-- deck_3d.gd             stacking, height, and drawn-card positions
-|   |-- ui_manager.gd          four-stat HUD and modals
+|   |-- ui_manager.gd          cat avatar + four-stat HUD
+|   |-- restart_button_3d.gd   tabletop restart button and game-over halo
+|   |-- audio_manager.gd       Music/SFX buses, one-shot pool, looping BGM
 |   `-- main.gd                3D field/hand cards, die clicks, world card
 `-- tests/
     |-- test_rules.gd
@@ -237,9 +260,13 @@ Test coverage includes:
 - Emperor interception (upright and reversed);
 - full-hand replacement chosen directly from the 3D hand;
 - structured effect data checks and stat icons in card effect text;
-- the full 21-choice split flow, unique cards, empty deck/field, and World end;
+- the full 21-choice split flow, unique cards, empty deck/field, World draw
+  animation, hidden draw pile, and World end;
 - card-attached 3D action icons and effects, sequential exit/entry animations,
-  hand hover effects, and the 3D mark hand.
+  hand hover effects, and the 3D mark hand;
+- all card/dice sounds and the looping background track loading at startup;
+- the tabletop restart button, the death/world-end halo, and the World card
+  clearing on a new run.
 
 ## Known simplifications
 
@@ -248,7 +275,7 @@ Test coverage includes:
 - A card's highest/lowest condition uses fixed stat order for ties.
 - Strength reversed's once-per-run low-stat boost targets the lowest stat with the
   same fixed tie order.
-- No save/load, audio, or export preset is included.
-- The card art keeps its printed English titles; localized names are used in
-  modals.
+- No save/load or export preset is included.
+- The card art keeps its printed English titles; localized names are used in the
+  remaining UI text.
 - Source card filenames are preserved as supplied, including spaces.

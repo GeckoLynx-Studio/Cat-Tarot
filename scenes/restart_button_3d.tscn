@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/restart_button_3d.gd" id="1_restart"]
+
+[sub_resource type="BoxShape3D" id="Shape_restart"]
+size = Vector3(0.9, 0.12, 0.9)
+
+[node name="RestartButton3D" type="Node3D"]
+script = ExtResource("1_restart")
+
+[node name="Area3D" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+input_ray_pickable = true
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D"]
+shape = SubResource("Shape_restart")
