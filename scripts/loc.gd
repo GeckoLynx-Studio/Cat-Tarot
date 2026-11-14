@@ -102,7 +102,7 @@ const TEXTS := {
 		"ui.used": "已用",
 		"ui.passive": "被动",
 		"ui.final": "终局",
-		"ui.restart": "重开",
+		"ui.restart": "重来",
 		"ui.lang_switch": "EN",
 		"ui.lang_tip": "切换语言",
 		"ui.new_run": "新的一局",

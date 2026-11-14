@@ -12,6 +12,16 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	ui = main.get_node("UI")
+	var top_bar: Control = ui.root.get_node_or_null("TopBar")
+	check(top_bar != null, "top bar exists")
+	check_eq(top_bar.get_child_count(), 1, "top bar has a single content row")
+	check_eq((top_bar.get_child(0) as Node).get_child_count(), 2, "top bar shows only the cat avatar and stats")
+	check_eq(Audio._streams.size(), Audio.SFX_FILES.size(), "all card and dice sounds load")
+	check(Audio._music != null and Audio._music.stream != null, "background music loads")
+	if Audio._music != null and Audio._music.stream is AudioStreamOggVorbis:
+		check((Audio._music.stream as AudioStreamOggVorbis).loop, "background music loops seamlessly")
+	check(Audio.is_music_playing(), "background music starts with a run")
+	check(main.restart_button != null, "restart button sits on the table")
 	await get_tree().create_timer(6.2).timeout
 	check(GameManager.field_cards.size() == 3, "opening field")
 	check(GameManager.deck.size() == 18, "opening deck")
@@ -132,7 +142,7 @@ func _ready() -> void:
 	main._on_card_accept()
 	await get_tree().create_timer(1.4).timeout
 	check(not GameManager.pending_new_mark.is_empty(), "sixth mark waits for a hand choice")
-	check_eq(ui._modal_kind, "", "no replacement modal")
+	check(not main.restart_button.is_highlighted(), "no restart halo while the run continues")
 	check_eq(main._hand_cards.size(), 5, "hand fan keeps the five held marks")
 	var hand_layers: Array[float] = []
 	for holder in main._hand_holders:
@@ -164,7 +174,7 @@ func _ready() -> void:
 	main._on_card_accept()
 	await get_tree().process_frame
 	await get_tree().process_frame
-	check_eq(ui._modal_kind, "", "Tower opens no choice modal")
+	check(not main.restart_button.is_highlighted(), "Tower does not light the restart halo")
 	check_eq(int(GameManager.stats["passion"]), 5, "Tower reverses the highest stat")
 	check_eq(int(GameManager.stats["intuition"]), 5, "Tower raises the lowest stat")
 
@@ -179,9 +189,10 @@ func _ready() -> void:
 	await get_tree().process_frame
 	check_eq(GameManager.phase, 4, "death ends the run")
 	check_eq(GameManager.game_over_reason_key, "reason.death", "death reason")
-	check_eq(ui._modal_kind, "gameover", "death shows the end screen")
+	check(main.restart_button.is_highlighted(), "death lights the restart halo")
+	check(ui.root.get_node_or_null("ModalLayer") == null, "death shows no end panel")
 
-	# World-end modal wiring.
+	# World-end restart halo wiring.
 	GameManager.new_game(99)
 	GameManager.debug_set_choices(20)
 	GameManager.debug_set_field_card(0, 0, "UPRIGHT")
@@ -191,8 +202,23 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	check_eq(GameManager.phase, 4, "world end phase")
-	check_eq(ui._modal_kind, "gameover", "world end modal opened")
-	await get_tree().create_timer(1.3).timeout
+	check(main.restart_button.is_highlighted(), "world end lights the restart halo")
+	check(ui.root.get_node_or_null("ModalLayer") == null, "world end shows no end panel")
+	await get_tree().create_timer(3.5).timeout
+	check(main._world_card != null and is_instance_valid(main._world_card), "World card is drawn to the table")
+	var any_deck_card_visible := false
+	for deck_card in main.deck._cards:
+		if deck_card.visible:
+			any_deck_card_visible = true
+	check(not any_deck_card_visible and not main.deck._top_visual.visible, "draw pile is hidden after the World")
+
+	# The tabletop restart button starts a clean run and clears the World card.
+	main.restart_button.pressed.emit()
+	await get_tree().create_timer(1.4).timeout
+	check_eq(GameManager.phase, GameManager.Phase.SELECT, "table restart starts a new run")
+	check(not main.restart_button.is_highlighted(), "restart halo clears on a new run")
+	check(main._world_card == null, "World card leaves the table on a new run")
+	check(main.deck._top_visual.visible, "draw pile returns on a new run")
 
 	print("UI smoke failures: %d" % failed)
 	get_tree().quit(1 if failed > 0 else 0)

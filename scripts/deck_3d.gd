@@ -10,6 +10,7 @@ const TOP_RAISE := 0.03
 var _cards: Array[MeshInstance3D] = []
 var _top_visual: Node3D
 var _remaining := DRAWABLE_CARDS
+var _hidden: bool = false
 var _top_tween: Tween
 
 
@@ -63,7 +64,16 @@ func _build() -> void:
 
 func reset() -> void:
 	_remaining = DRAWABLE_CARDS
+	_hidden = false
+	_top_visual.visible = true
 	_refresh(false)
+
+
+func hide_all() -> void:
+	_hidden = true
+	for card in _cards:
+		card.visible = false
+	_top_visual.visible = false
 
 
 func draw_cards(count: int) -> void:
@@ -79,6 +89,8 @@ func top_card_position() -> Vector3:
 
 
 func _refresh(animate: bool) -> void:
+	if _hidden:
+		return
 	for i in TOTAL_VISUAL_CARDS:
 		_cards[i].visible = i <= _remaining
 	var target := float(_remaining + 1) * CARD_THICKNESS

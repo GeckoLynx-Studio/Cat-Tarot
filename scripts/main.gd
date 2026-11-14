@@ -13,13 +13,14 @@ const HAND_STACK_STEP := 0.01
 const HAND_HOLD_POS := Vector3(0.0, 0.6, 2.4)
 const HAND_HOLD_SCALE := 0.92
 const DISCARD_POS := Vector3(5.4, 1.2, 2.85)
-const CARD_MOVE_TIME := 1.05
+const CARD_MOVE_TIME := 0.90
 
 @onready var card_root: Node3D = $CardRoot
 @onready var camera: Camera3D = $Camera3D
 @onready var sun: DirectionalLight3D = $DirectionalLight3D
 @onready var dice: Dice3D = $Dice3D
 @onready var deck: Node3D = $Deck3D
+@onready var restart_button: RestartButton3D = $RestartButton3D
 
 var _slot_cards: Array = [null, null, null]
 var _hand_root: Node3D
@@ -27,6 +28,7 @@ var _hand_cards: Array[Card3D] = []
 var _hand_holders: Array[Node3D] = []
 var _textures: Dictionary = {}
 var _world_shown: bool = false
+var _world_card: Card3D = null
 var _seed: int = 0
 var _choice_animating: bool = false
 var _defer_hand_rebuild: bool = false
@@ -37,6 +39,7 @@ var _pending_hold_card: Card3D = null
 var _hold_slot: int = -1
 var _hand_discarding: bool = false
 var _hand_lift_tween: Tween
+var _roll_pending: bool = false
 
 
 func _ready() -> void:
@@ -53,6 +56,8 @@ func _ready() -> void:
 	GameManager.state_changed.connect(_on_state_changed)
 	GameManager.game_started.connect(_on_game_started)
 	dice.clicked.connect(_on_die_clicked)
+	dice.roll_finished.connect(_on_die_roll_finished)
+	restart_button.pressed.connect(_on_restart_pressed)
 	Loc.language_changed.connect(_on_language_changed)
 	_seed = _read_seed()
 	GameManager.new_game(_seed)
@@ -104,8 +109,9 @@ func _apply_field_cards(cards: Array) -> void:
 		var card_id := int(runtime["card_id"])
 		if node != null and is_instance_valid(node) and node.card_id == card_id:
 			node.base_position = target
-			node.set_state(str(runtime["orientation"]))
-			node.set_effect_text(_effect_text(card_id, str(runtime["orientation"])))
+			if not _roll_pending:
+				node.set_state(str(runtime["orientation"]))
+				node.set_effect_text(_effect_text(card_id, str(runtime["orientation"])))
 			continue
 		if node != null and is_instance_valid(node):
 			node.queue_free()
@@ -144,6 +150,7 @@ func _deal_card(request: Dictionary) -> void:
 	card.accept_pressed.connect(_on_card_accept)
 	card.refuse_pressed.connect(_on_card_refuse)
 	_slot_cards[slot] = card
+	Audio.play_sfx("card_draw", -4.0)
 	deck.draw_cards(1)
 	if not await _animate_card_draw(pivot, card):
 		return
@@ -152,19 +159,21 @@ func _deal_card(request: Dictionary) -> void:
 	await _animate_card_entry(card, target, orientation)
 
 
-func _animate_card_draw(pivot: Node3D, card: Card3D) -> bool:
+func _animate_card_draw(pivot: Node3D, card: Card3D, reveal_sound: bool = false) -> bool:
 	pivot.rotation.z = PI
 	card.set_back_visible(true)
 	var start_y := pivot.position.y
 	var spin := create_tween()
-	spin.tween_property(pivot, "rotation:z", 0.0, 0.55)
+	spin.tween_property(pivot, "rotation:z", 0.0, 0.50)
 	var arc := create_tween()
-	arc.tween_property(pivot, "position:y", start_y + 0.8, 0.275).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	arc.tween_property(pivot, "position:y", start_y + 0.2, 0.275).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	await get_tree().create_timer(0.275).timeout
+	arc.tween_property(pivot, "position:y", start_y + 0.8, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	arc.tween_property(pivot, "position:y", start_y + 0.2, 0.25).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	await get_tree().create_timer(0.25).timeout
 	if is_instance_valid(card):
 		card.set_back_visible(false)
-	await get_tree().create_timer(0.29).timeout
+		if reveal_sound:
+			Audio.play_sfx("card_reveal", -2.0)
+	await get_tree().create_timer(0.25).timeout
 	if is_instance_valid(pivot):
 		pivot.rotation.z = 0.0
 		pivot.position.y = start_y + 0.2
@@ -176,6 +185,7 @@ func _animate_card_draw(pivot: Node3D, card: Card3D) -> bool:
 
 
 func _animate_card_entry(card: Card3D, target: Vector3, orientation: String) -> void:
+	Audio.play_sfx("card_slide", -7.0)
 	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
@@ -184,7 +194,9 @@ func _animate_card_entry(card: Card3D, target: Vector3, orientation: String) -> 
 	await tween.finished
 	if not is_instance_valid(card):
 		return
-	if orientation == "REVERSED":
+	var target_reversed := orientation.to_upper() == "REVERSED"
+	if card.is_reversed != target_reversed:
+		Audio.play_sfx("card_flip", -5.0)
 		card.set_state(orientation)
 		if card._flip_tween != null and card._flip_tween.is_valid():
 			await card._flip_tween.finished
@@ -197,6 +209,7 @@ func _animate_card_entry(card: Card3D, target: Vector3, orientation: String) -> 
 
 
 func _on_card_clicked(card_id: int) -> void:
+	Audio.play_sfx("card_tap", -5.0)
 	GameManager.select_card(card_id)
 
 
@@ -254,7 +267,7 @@ func _lift_hand() -> void:
 	for holder in _hand_holders:
 		if holder == null or not is_instance_valid(holder):
 			continue
-		_hand_lift_tween.tween_property(holder, "position:y", holder.position.y + 0.15, 0.4)
+		_hand_lift_tween.tween_property(holder, "position:y", holder.position.y + 0.15, 0.36)
 
 
 func _animate_hand_gap(count: int) -> void:
@@ -270,8 +283,8 @@ func _animate_hand_gap(count: int) -> void:
 		if holder == null or not is_instance_valid(holder):
 			continue
 		var layout := _hand_slot_layout(i, count)
-		tween.tween_property(holder, "position", layout["position"], 0.42)
-		tween.tween_property(holder, "rotation:y", float(layout["yaw"]), 0.42)
+		tween.tween_property(holder, "position", layout["position"], 0.40)
+		tween.tween_property(holder, "rotation:y", float(layout["yaw"]), 0.40)
 	await tween.finished
 
 
@@ -282,6 +295,9 @@ func _play_choice_exit(card: Card3D, accepted: bool, slot: int, accept_layout: D
 		return
 	if accepted:
 		await _animate_hand_gap(hand_count)
+		Audio.play_sfx("card_slide", -3.0)
+	else:
+		Audio.play_sfx("card_discard", -3.0)
 	var target: Vector3
 	var target_scale: Vector3
 	var target_yaw: float
@@ -359,6 +375,8 @@ func _apply_selection_visual() -> void:
 
 
 func _refresh_card_actions() -> void:
+	if _roll_pending:
+		return
 	for card in _slot_cards:
 		if card != null and is_instance_valid(card):
 			card.hide_actions()
@@ -373,22 +391,42 @@ func _refresh_card_actions() -> void:
 
 
 func _on_orientation_rolled(value: int) -> void:
+	_roll_pending = true
+	for card in _slot_cards:
+		if card != null and is_instance_valid(card):
+			card.hide_actions()
+	dice.roll_to(value)
+
+
+func _on_die_roll_finished(_value: int) -> void:
+	if not _roll_pending:
+		return
+	_roll_pending = false
+	var any_flip := false
 	for i in _slot_cards.size():
 		var card: Card3D = _slot_cards[i]
 		var runtime = GameManager.field_cards[i] if i < GameManager.field_cards.size() else null
 		if card != null and is_instance_valid(card) and runtime != null:
+			var target_reversed := str(runtime["orientation"]).to_upper() == "REVERSED"
+			if card.is_reversed != target_reversed:
+				any_flip = true
 			card.set_state(str(runtime["orientation"]))
 			card.set_effect_text(_effect_text(int(runtime["card_id"]), str(runtime["orientation"])))
-	dice.roll_to(value)
+	if any_flip:
+		Audio.play_sfx("card_flip", -4.0)
 	_refresh_card_actions()
 
 
 func _on_die_clicked() -> void:
 	if GameManager.phase == GameManager.Phase.SELECT:
+		Audio.play_sfx("dice_roll", -2.0)
 		GameManager.roll_die()
 
 
 func _on_game_started(_seed_value: int) -> void:
+	Audio.start_music()
+	restart_button.set_highlight(false)
+	_roll_pending = false
 	dice.reset(int(GameManager.die_value))
 	deck.reset()
 	_clear_cards()
@@ -413,25 +451,55 @@ func _on_language_changed() -> void:
 
 func _on_state_changed() -> void:
 	_apply_selection_visual()
+	restart_button.set_highlight(GameManager.phase == GameManager.Phase.GAME_OVER)
 	if GameManager.phase == GameManager.Phase.FINAL or (GameManager.phase == GameManager.Phase.GAME_OVER and GameManager.game_over_reason_key == "reason.world_end"):
 		_show_world()
+
+
+func _on_restart_pressed() -> void:
+	GameManager.new_game(0)
 
 
 func _show_world() -> void:
 	if _world_shown:
 		return
-	_clear_cards()
-	var card: Card3D = CARD_SCENE.instantiate()
-	card.position = Vector3(0.0, CARD_Y, CARD_Z)
-	card_root.add_child(card)
-	card.setup(WORLD_ID, _texture_for(WORLD_ID))
-	card.base_position = card.position
-	card.set_world_display()
-	card.set_selected(true)
 	_world_shown = true
+	while _choice_animating and _world_shown:
+		await get_tree().process_frame
+	if not _world_shown:
+		return
+	_clear_cards()
+	var target := Vector3(0.0, CARD_Y, CARD_Z)
+	var pivot := Node3D.new()
+	pivot.position = card_root.to_local(deck.top_card_position())
+	card_root.add_child(pivot)
+	_world_card = CARD_SCENE.instantiate()
+	pivot.add_child(_world_card)
+	_world_card.position = Vector3.ZERO
+	_world_card.setup(WORLD_ID, _texture_for(WORLD_ID))
+	_world_card.base_position = target
+	_world_card.scale = Vector3.ONE * 0.9
+	_world_card.animation_locked = true
+	_world_card.area.input_ray_pickable = false
+	Audio.play_sfx("card_draw", -4.0)
+	if not await _animate_card_draw(pivot, _world_card, true):
+		return
+	_world_card.reparent(card_root, true)
+	pivot.queue_free()
+	deck.hide_all()
+	await _animate_card_entry(_world_card, target, "UPRIGHT")
+	if not is_instance_valid(_world_card):
+		return
+	_world_card.area.input_ray_pickable = false
+	_world_card.base_position = target
+	_world_card.set_world_display()
+	_world_card.set_selected(true)
 
 
 func _clear_cards() -> void:
+	if _world_card != null and is_instance_valid(_world_card):
+		_world_card.queue_free()
+	_world_card = null
 	for card in _slot_cards:
 		if card != null and is_instance_valid(card):
 			card.queue_free()
@@ -532,12 +600,13 @@ func _discard_and_replace(card_id: int) -> void:
 func _animate_hand_drop(holder: Node3D) -> void:
 	if holder == null or not is_instance_valid(holder):
 		return
+	Audio.play_sfx("card_discard", -3.0)
 	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-	tween.tween_property(holder, "position", holder.position + Vector3(0.0, -0.4, 1.6), 0.4)
-	tween.tween_property(holder, "scale", holder.scale * 0.4, 0.4)
-	tween.tween_property(holder, "rotation:y", holder.rotation.y + deg_to_rad(40.0), 0.4)
+	tween.tween_property(holder, "position", holder.position + Vector3(0.0, -0.4, 1.6), 0.36)
+	tween.tween_property(holder, "scale", holder.scale * 0.4, 0.36)
+	tween.tween_property(holder, "rotation:y", holder.rotation.y + deg_to_rad(40.0), 0.36)
 	await tween.finished
 	if is_instance_valid(holder):
 		holder.queue_free()
@@ -554,9 +623,9 @@ func _animate_hold_into_hand() -> void:
 	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(card, "position", layout["position"], 0.55)
-	tween.tween_property(card, "scale", Vector3.ONE * float(layout["scale"]), 0.55)
-	tween.tween_property(card, "rotation:y", float(layout["yaw"]), 0.55)
+	tween.tween_property(card, "position", layout["position"], 0.50)
+	tween.tween_property(card, "scale", Vector3.ONE * float(layout["scale"]), 0.50)
+	tween.tween_property(card, "rotation:y", float(layout["yaw"]), 0.50)
 	await tween.finished
 
 
