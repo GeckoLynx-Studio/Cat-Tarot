@@ -1,0 +1,57 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Fetch published asset bundle (if any)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download assets -p 'assets.tar.gz' --clobber || true
+      - name: Extract + verify assets.sha256
+        run: |
+          if [ -f assets.tar.gz ]; then
+            tar -xzf assets.tar.gz
+            python tools/assets.py check
+          else
+            echo "no published asset bundle yet - skipping"
+          fi
+
+  gdscript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install "gdtoolkit==4.*"
+      - name: Format check (advisory)
+        continue-on-error: true
+        run: gdformat --check --diff scripts tests 2>/dev/null || true
+      - name: Lint (advisory)
+        continue-on-error: true
+        run: gdlint scripts tests 2>/dev/null || true
+
+  pr-title:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: PR title uses Conventional Commits
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          printf '%s\n' "$TITLE" | grep -Eq '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9._/-]+\))?!?: .+' \
+            || { echo "PR title must be Conventional Commits, e.g. 'feat(cards): add shuffle'"; exit 1; }

@@ -1,0 +1,20 @@
+#!/bin/sh
+# Refuse to push when local assets/ no longer matches the committed assets.sha256.
+set -e
+root=$(git rev-parse --show-toplevel) || exit 0
+cd "$root" || exit 0
+
+py=""
+for c in python3 python py; do
+  if command -v "$c" >/dev/null 2>&1; then py="$c"; break; fi
+done
+[ -n "$py" ] || exit 0
+[ -f tools/assets.py ] || exit 0
+
+if ! "$py" tools/assets.py --root . check -q; then
+  echo "" >&2
+  echo "pre-push: assets/ is out of sync with assets.sha256." >&2
+  echo "  run tools/pack-assets.sh, then tools/push-assets.sh, then commit the stamp." >&2
+  exit 1
+fi
+exit 0

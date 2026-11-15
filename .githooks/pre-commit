@@ -1,0 +1,34 @@
+#!/bin/sh
+# Guard 1: assets/ changed but assets.sha256 is stale  -> block.
+# Guard 2: GDScript not formatted (if gdformat is installed) -> block.
+# Runs via Git's bundled sh on Windows, macOS and Linux.
+set -e
+root=$(git rev-parse --show-toplevel) || exit 0
+cd "$root" || exit 0
+
+py=""
+for c in python3 python py; do
+  if command -v "$c" >/dev/null 2>&1; then py="$c"; break; fi
+done
+
+if [ -n "$py" ] && [ -f tools/assets.py ]; then
+  if ! "$py" tools/assets.py --root . check -q; then
+    echo "" >&2
+    echo "pre-commit: asset bundle is stale (assets/ != assets.sha256)." >&2
+    echo "  1) tools/pack-assets.sh" >&2
+    echo "  2) tools/push-assets.sh" >&2
+    echo "  3) git add assets.sha256" >&2
+    exit 1
+  fi
+fi
+
+if command -v gdformat >/dev/null 2>&1; then
+  targets=""
+  [ -d scripts ] && targets="$targets scripts"
+  [ -d tests ] && targets="$targets tests"
+  if [ -n "$targets" ] && ! gdformat --check $targets 2>/dev/null; then
+    echo "pre-commit: GDScript is not formatted. Run: gdformat scripts tests" >&2
+    exit 1
+  fi
+fi
+exit 0
