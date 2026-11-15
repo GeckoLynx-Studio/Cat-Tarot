@@ -8,7 +8,7 @@ const STAT_KEYS: Array[String] = ["passion", "intuition", "curiosity", "comfort"
 const CARDS: Array[Dictionary] = [
   {
     "id": 0,
-    "file": "0. The Fool.png",
+    "file": "0. The Fool.webp",
     "name_en": "The Fool",
     "name_zh": "愚者",
     "upright_pips": [
@@ -156,7 +156,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 1,
-    "file": "1. The Magician.png",
+    "file": "1. The Magician.webp",
     "name_en": "The Magician",
     "name_zh": "魔术师",
     "upright_pips": [
@@ -276,7 +276,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 2,
-    "file": "2. The Priestess.png",
+    "file": "2. The Priestess.webp",
     "name_en": "The Priestess",
     "name_zh": "女祭司",
     "upright_pips": [
@@ -413,7 +413,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 3,
-    "file": "3. The Empress.png",
+    "file": "3. The Empress.webp",
     "name_en": "The Empress",
     "name_zh": "皇后",
     "upright_pips": [
@@ -562,7 +562,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 4,
-    "file": "4. The Emperor.png",
+    "file": "4. The Emperor.webp",
     "name_en": "The Emperor",
     "name_zh": "皇帝",
     "upright_pips": [
@@ -644,7 +644,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 5,
-    "file": "5. The Hierophant.png",
+    "file": "5. The Hierophant.webp",
     "name_en": "The Hierophant",
     "name_zh": "教皇",
     "upright_pips": [
@@ -773,7 +773,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 6,
-    "file": "6. The Lovers.png",
+    "file": "6. The Lovers.webp",
     "name_en": "The Lovers",
     "name_zh": "恋人",
     "upright_pips": [
@@ -901,7 +901,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 7,
-    "file": "7. The Chariot.png",
+    "file": "7. The Chariot.webp",
     "name_en": "The Chariot",
     "name_zh": "战车",
     "upright_pips": [
@@ -1035,7 +1035,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 8,
-    "file": "8. Justice.png",
+    "file": "8. Justice.webp",
     "name_en": "Justice",
     "name_zh": "正义",
     "upright_pips": [
@@ -1151,7 +1151,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 9,
-    "file": "9. The Hermit.png",
+    "file": "9. The Hermit.webp",
     "name_en": "The Hermit",
     "name_zh": "隐者",
     "upright_pips": [
@@ -1280,7 +1280,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 10,
-    "file": "10. Wheel of Fortune.png",
+    "file": "10. Wheel of Fortune.webp",
     "name_en": "Wheel of Fortune",
     "name_zh": "命运之轮",
     "upright_pips": [
@@ -1417,7 +1417,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 11,
-    "file": "11. Strength.png",
+    "file": "11. Strength.webp",
     "name_en": "Strength",
     "name_zh": "力量",
     "upright_pips": [
@@ -1549,7 +1549,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 12,
-    "file": "12. The Hanged Man.png",
+    "file": "12. The Hanged Man.webp",
     "name_en": "The Hanged Man",
     "name_zh": "倒吊人",
     "upright_pips": [
@@ -1678,7 +1678,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 13,
-    "file": "13. Death.png",
+    "file": "13. Death.webp",
     "name_en": "Death",
     "name_zh": "死神",
     "upright_pips": [
@@ -1799,7 +1799,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 14,
-    "file": "14. Temperance.png",
+    "file": "14. Temperance.webp",
     "name_en": "Temperance",
     "name_zh": "节制",
     "upright_pips": [
@@ -1915,7 +1915,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 15,
-    "file": "15. The Devil.png",
+    "file": "15. The Devil.webp",
     "name_en": "The Devil",
     "name_zh": "恶魔",
     "upright_pips": [
@@ -2036,7 +2036,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 16,
-    "file": "16. The Star.png",
+    "file": "16. The Star.webp",
     "name_en": "The Star",
     "name_zh": "星星",
     "upright_pips": [
@@ -2170,7 +2170,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 17,
-    "file": "17. The Tower.png",
+    "file": "17. The Tower.webp",
     "name_en": "The Tower",
     "name_zh": "高塔",
     "upright_pips": [
@@ -2285,7 +2285,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 18,
-    "file": "18. The Moon.png",
+    "file": "18. The Moon.webp",
     "name_en": "The Moon",
     "name_zh": "月亮",
     "upright_pips": [
@@ -2414,7 +2414,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 19,
-    "file": "19. The Sun.png",
+    "file": "19. The Sun.webp",
     "name_en": "The Sun",
     "name_zh": "太阳",
     "upright_pips": [
@@ -2530,7 +2530,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 20,
-    "file": "20. Judgement.png",
+    "file": "20. Judgement.webp",
     "name_en": "Judgement",
     "name_zh": "审判",
     "upright_pips": [
@@ -2646,7 +2646,7 @@ const CARDS: Array[Dictionary] = [
   },
   {
     "id": 21,
-    "file": "21. The World.png",
+    "file": "21. The World.webp",
     "name_en": "The World",
     "name_zh": "世界",
     "upright_pips": [],

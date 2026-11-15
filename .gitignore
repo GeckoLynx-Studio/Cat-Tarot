@@ -1,5 +1,5 @@
-# Raw assets are not tracked; only assets.tar.gz is committed
-/assets/
+# Archival bundle, kept as a GitHub Release asset instead of in git
+/assets.tar.gz
 
 # Godot
 .godot/

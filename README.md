@@ -14,7 +14,7 @@ buttons.
 From this folder:
 
 ```bash
-tar -xzf assets.tar.gz   # only needed after a fresh clone; restores assets/
+git lfs install   # once per machine, before the first clone/pull
 godot --path .
 ```
 
@@ -170,7 +170,9 @@ panel appears; the tabletop restart button lights up with a pulsing halo.
 
 ## Assets and icons
 
-- Card art is under `assets/cards/` with original supplied file names preserved.
+- Card art is under `assets/cards/` as 1024px-wide WebP, with original supplied
+  file names preserved. The original 1664x2880 PNGs are archived outside git in
+  the `assets-source-v1` GitHub Release (`assets.tar.gz`).
 - Icons are from the supplied `no-padding` pack in `assets/icons/`.
 - The Chinese UI font is `assets/fonts/lemi_zhixia_qianfeng.ttf`.
 - The 3D die is exported from the supplied `DiceLowPoly.blend` to
@@ -180,6 +182,22 @@ panel appears; the tabletop restart button lights up with a pulsing halo.
 - The looping background track is `assets/audio/music/tarot_ambience.ogg`, an
   original ambient piece composed for this project.
 - Source/license notes are in `assets/LICENSES.md`.
+
+### Asset workflow
+
+Binary assets (`png`, `webp`, `wav`, `ogg`, `glb`, `blend`, `ttf`) are tracked
+with Git LFS. Keep the following rules so Godot UIDs stay stable:
+
+- Commit a resource and its `.import` file together; never commit one without
+  the other. Script `.uid` files are committed too.
+- Before editing a binary asset, run `git lfs lock <path>` and unlock it after
+  pushing. Claim a new asset path in an issue before adding it.
+- Rename or move assets inside the Godot editor, never from the file manager.
+- Do not hand-merge `.uid` or `.import` conflicts. Keep one side as a complete
+  resource/metadata pair, delete the other, then run
+  `godot --headless --path . --import` and check references.
+- Run `godot --headless --path . --import` before committing so import metadata
+  is normalized.
 
 Stat icon mapping: fire = Passion, eye = Intuition, star = Curiosity, leaf =
 Comfort. Effects use signed numbers; positive and negative deltas use green/red
@@ -201,8 +219,9 @@ break gameplay.
 Cat-Tarot/
 |-- project.godot
 |-- README.md
+|-- .gitattributes            LFS tracking and line-ending rules
 |-- assets/
-|   |-- cards/                 supplied PNGs, original file names preserved
+|   |-- cards/                 optimized WebP card art
 |   |-- icons/                 supplied no-padding icons
 |   |-- fonts/                 cute Chinese UI font
 |   |-- models/                GLB die + original blend source
@@ -210,7 +229,6 @@ Cat-Tarot/
 |   |   |-- sfx/               card, deck, and dice WAV effects
 |   |   `-- music/             looping ambient background track
 |   `-- LICENSES.md
-|-- assets.tar.gz
 |-- scenes/
 |   |-- main.tscn              table, camera, die, draw pile, UI layer
 |   |-- card_3d.tscn           flat card + 3D effect/action overlays
