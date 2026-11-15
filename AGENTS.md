@@ -16,10 +16,12 @@ working on a fork or opening a PR (including with an AI agent), follow it exactl
 
 ## Read the README first
 
-`README.md` has a fixed structure (Overview, Requirements, Getting the assets, Run, Tests, Project
-layout, Development, Cross-platform, Contributing, Credits & licenses, Status). Keep that structure
-and keep **gameplay out of it** — rules, controls, walkthroughs and balance go in
-`docs/GAMEPLAY.md`.
+`README.md` has a fixed structure: Overview, Requirements, Getting the assets, Run and Tests,
+Project layout, Development, Contributing. The H1 title is **centered**, carries **several badges**
+(>= 4), and is followed by a single **italic one-line hook** that captures the game in a sentence —
+write something evocative, not a stiff genre label. Overview shows `docs/screenshot.png`. Keep that
+structure and keep **gameplay out of it** — rules, controls, walkthroughs and balance go in
+`docs/GAMEPLAY.md`; credits/licenses go in `docs/CREDITS.md`.
 
 ## Assets: download them first (after clone)
 
@@ -141,5 +143,5 @@ something cannot run on an OS, say so in the README.
 - Do not add Git LFS, and do not commit build output (`.godot/`, exports, `*.pck`).
 - Do not introduce dependencies on sibling game folders or on the workspace root; this repo must
   build and run when cloned on its own.
-- Keep third-party asset terms in `assets/LICENSES.md` (it travels inside the bundle) and in the
-  README credits.
+- Keep third-party asset terms in `assets/LICENSES.md` (it travels inside the bundle) and in
+  `docs/CREDITS.md`.

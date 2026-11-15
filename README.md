@@ -1,6 +1,18 @@
-# Cat-Tarot
+<h1 align="center">Cat-Tarot</h1>
+
+<p align="center">
+  <img alt="Godot 4.6" src="https://img.shields.io/badge/Godot-4.6-478cbf?logo=godotengine&logoColor=white">
+  <img alt="GDScript" src="https://img.shields.io/badge/GDScript-4.x-355570?logo=godotengine&logoColor=white">
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey">
+  <img alt="Status" src="https://img.shields.io/badge/status-complete%20prototype-brightgreen">
+  <img alt="Assets" src="https://img.shields.io/badge/assets-GitHub%20Release-blue">
+</p>
+
+<p align="center"><em>Twenty-one cards decide how much of yourself you are willing to spend.</em></p>
 
 ## Overview
+
+![Gameplay screenshot](docs/screenshot.png)
 
 A single-player 3D tarot roguelike built with Godot 4.6. Rules, controls and balance are in
 [`docs/GAMEPLAY.md`](docs/GAMEPLAY.md).
@@ -30,18 +42,20 @@ powershell -File tools\fetch-assets.ps1     # Windows PowerShell
 It uses a local bundle if present, otherwise downloads from the release, extracts to `assets/`, and
 verifies against the committed `assets.sha256`.
 
-## Run
+## Run and Tests
+
+Import assets once after fetching them, then run:
 
 ```bash
+godot --headless --path . --import
 godot --path .
 ```
 
 Debug seed: `godot --path . -- --seed=1234`.
 
-## Tests
+Tests:
 
 ```bash
-godot --headless --path . --import
 godot --headless --path . res://tests/rules_test.tscn
 godot --headless --path . res://tests/ui_smoke.tscn
 godot --headless --path . res://tests/interactions_test.tscn
@@ -54,7 +68,9 @@ Cat-Tarot/
 |-- project.godot
 |-- README.md            uniform structure
 |-- AGENTS.md            agent/contributor conventions (identical across games)
-|-- docs/GAMEPLAY.md     rules, controls, balance
+|-- docs/
+|   |-- GAMEPLAY.md      rules, controls, balance
+|   `-- screenshot.png   image shown in Overview
 |-- assets/              raw assets (git-ignored; restored from the release)
 |-- scenes/              main, card_3d, deck_3d, dice_3d, restart_button_3d
 |-- scripts/             rules engine, UI, audio, card/dice/deck nodes
@@ -66,8 +82,9 @@ Cat-Tarot/
 
 ## Development
 
-- Commit messages follow **Conventional Commits**.
-- Hooks are enabled via `core.hooksPath=.githooks`; `pre-commit` blocks a stale asset stamp and
+- Commit messages follow **Conventional Commits** with a required scope, body and sign-off; see
+  `AGENTS.md`.
+- Git hooks are enabled via `core.hooksPath=.githooks`; `pre-commit` blocks a stale asset stamp and
   checks `gdformat` when installed.
 - **If you change anything under `assets/`:**
 
@@ -78,29 +95,11 @@ git add assets.sha256
 git commit -m "chore(assets): update bundle"
 ```
 
-Never commit `assets/`, `assets.tar.gz` or `assets.zip`. No Git LFS.
-
-## Cross-platform
-
-| Task | Linux / macOS | Windows |
-|------|---------------|---------|
-| Fetch assets | `tools/fetch-assets.sh` | `tools\fetch-assets.ps1` |
-| Pack assets | `tools/pack-assets.sh` | `tools\pack-assets.ps1` |
-| Publish assets | `tools/push-assets.sh` | `tools\push-assets.ps1` |
-| Git hooks | native `sh` | Git for Windows (bundled `sh`) |
+Never commit `assets/`, `assets.tar.gz` or `assets.zip`. No Git LFS. Every script ships as both a
+`*.sh` (Linux/macOS/Git Bash) and a `*.ps1` (Windows PowerShell) wrapper.
 
 ## Contributing
 
 - Read `AGENTS.md` first; it is identical in every game repo of this workspace.
 - Keep the PR title in Conventional Commits form and follow `.github/pull_request_template.md`.
 - AI-assisted forks/PRs are welcome under the same conventions.
-
-## Credits & licenses
-
-Card art, icons, the Chinese UI font (`乐米栀夏浅风体`), the 3D die and the tabletop audio are
-third-party or supplied sources; see `assets/LICENSES.md` (travels in the bundle). The ambient
-background track is original to this project.
-
-## Status
-
-Complete prototype.

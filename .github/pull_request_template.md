@@ -10,6 +10,7 @@
 - [ ] `assets.sha256` is committed; `assets/`, `assets.tar.gz`, `assets.zip` are **not** committed
 - [ ] GDScript is formatted (`gdformat scripts tests`) and `gdlint scripts tests` is clean
 - [ ] README keeps the fixed H2 structure and documents asset download / extract / install
+- [ ] README title is centered with >= 4 badges, an italic one-line hook, and a screenshot in Overview
 - [ ] Gameplay (rules, controls, balance) is in `docs/GAMEPLAY.md`, **not** the README
 - [ ] `AGENTS.md` is unchanged (it is identical in every game repo)
 - [ ] Tested on: <Linux | macOS | Windows>
