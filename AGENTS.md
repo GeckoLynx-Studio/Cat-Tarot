@@ -5,7 +5,7 @@ working on a fork or opening a PR (including with an AI agent), follow it exactl
 
 ## Project facts
 
-- **Engine:** Godot **4.6**, GDScript with static typing. Project file: `project.godot`.
+- **Engine:** Godot **4.7**, GDScript with static typing. Project file: `project.godot`.
 - **File names:** `snake_case`. One scene per purpose under `scenes/`, scripts under `scripts/`,
   tests under `tests/`.
 - **Assets are not in Git.** `assets/`, `assets.tar.gz` and `assets.zip` are git-ignored; only
@@ -13,6 +13,9 @@ working on a fork or opening a PR (including with an AI agent), follow it exactl
 - **Asset bundles live on this repo's GitHub Release tagged `assets`** as two equivalent files:
   `assets.tar.gz` (macOS/Linux) and `assets.zip` (Windows).
 - **No Git LFS, ever.** LFS quota is shared by every game repo in the account.
+- **License:** `LICENSE` at the repo root covers the code (MIT by default — fill in the copyright
+  line). Third-party asset terms live in `assets/LICENSES.md` (inside the bundle) and in
+  `docs/CREDITS.md`.
 
 ## Read the README first
 

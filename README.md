@@ -1,7 +1,7 @@
 <h1 align="center">Cat-Tarot</h1>
 
 <p align="center">
-  <img alt="Godot 4.6" src="https://img.shields.io/badge/Godot-4.6-478cbf?logo=godotengine&logoColor=white">
+  <img alt="Godot 4.7" src="https://img.shields.io/badge/Godot-4.7-478cbf?logo=godotengine&logoColor=white">
   <img alt="GDScript" src="https://img.shields.io/badge/GDScript-4.x-355570?logo=godotengine&logoColor=white">
   <img alt="Platforms" src="https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey">
   <img alt="Status" src="https://img.shields.io/badge/status-complete%20prototype-brightgreen">
@@ -14,12 +14,12 @@
 
 ![Gameplay screenshot](docs/screenshot.png)
 
-A single-player 3D tarot roguelike built with Godot 4.6. Rules, controls and balance are in
+A single-player 3D tarot roguelike built with Godot 4.7. Rules, controls and balance are in
 [`docs/GAMEPLAY.md`](docs/GAMEPLAY.md).
 
 ## Requirements
 
-- Godot **4.6** (`godot` on `PATH`)
+- Godot **4.7** (`godot` on `PATH`)
 - Python **3.8+** (asset tooling)
 - `gh` CLI (only to publish assets / fetch private releases)
 
