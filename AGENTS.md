@@ -50,12 +50,14 @@ re-import:
 rm -rf .godot && godot --headless --path . --import
 ```
 
-Manual alternative - download from the `assets` release, extract at the repo root, then verify:
+Manual alternative - download the archive from the `assets` release into the repo root and run
+`tools/fetch-assets.sh` (it uses the local bundle, extracts it, and verifies the stamp). If you
+extract by hand anyway, verify with `tools/check-assets.sh`:
 
 ```bash
 tar -xzf assets.tar.gz                          # macOS / Linux
 Expand-Archive assets.zip -DestinationPath .    # Windows PowerShell
-python tools/assets.py check                    # verify assets/ matches assets.sha256
+tools/check-assets.sh                           # verify assets/ matches assets.sha256
 ```
 
 If the repo has no GitHub remote yet, only a local bundle can be used - never delete `assets/`.
@@ -89,7 +91,7 @@ Prerequisites: Python 3.8+; `gh` authenticated; a GitHub remote to publish to.
    git commit    # message: chore(assets): update bundle  + body + Signed-off-by
    ```
 
-5. Verify: `python tools/assets.py check` must pass.
+5. Verify: `tools/check-assets.sh` must pass.
 
 ### Contributor with write access (maintainer, or a branch in the repo)
 
@@ -109,23 +111,23 @@ You cannot publish to the upstream repo's Release (no write access). Instead:
 
 ### Merging a PR that changed assets (maintainer)
 
-1. Download the contributor's bundle from their fork Release and extract it at the repo root:
+1. Check out the PR branch (so `assets.sha256` is the PR's new stamp), then download the
+   contributor's bundle from their fork Release and let `fetch` verify it:
 
    ```bash
+   git fetch origin pull/<N>/head:pr-<N>
+   git checkout pr-<N>
    gh release download assets -R <fork-owner>/<repo> -p 'assets.tar.gz' --clobber -D .
-   tar -xzf assets.tar.gz
+   tools/fetch-assets.sh    # uses the local bundle, extracts it, verifies against pr-<N>'s stamp
    ```
 
-2. Verify the extracted `assets/` matches the PR's `assets.sha256` (never skip this — a mismatch
-   means the bundle does not match the code):
+2. Publish to the **upstream** `assets` Release (you have write access):
 
    ```bash
-   python tools/assets.py stamp    # prints the recomputed content hash
+   tools/push-assets.sh
    ```
 
-   The printed hash **must equal the stamp shown in the PR diff**.
-3. `tools/push-assets.sh` to publish to the **upstream** `assets` Release (you have write access).
-4. `python tools/assets.py check`, run the tests, then merge.
+3. Run the tests, then merge.
 
 Hard rules:
 

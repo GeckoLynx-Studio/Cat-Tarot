@@ -43,7 +43,7 @@ It uses a local bundle if present, otherwise downloads from the release, extract
 verifies against the committed `assets.sha256`.
 
 If you extract the archive by hand (the two bullets above), verify afterwards with
-`python tools/assets.py check`.
+`tools/check-assets.sh`.
 
 ## Run and Tests
 
