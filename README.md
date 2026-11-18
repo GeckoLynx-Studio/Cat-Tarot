@@ -42,6 +42,9 @@ powershell -File tools\fetch-assets.ps1     # Windows PowerShell
 It uses a local bundle if present, otherwise downloads from the release, extracts to `assets/`, and
 verifies against the committed `assets.sha256`.
 
+If you extract the archive by hand (the two bullets above), verify afterwards with
+`python tools/assets.py check`.
+
 ## Run and Tests
 
 Import assets once after fetching them, then run:

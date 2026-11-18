@@ -50,11 +50,12 @@ re-import:
 rm -rf .godot && godot --headless --path . --import
 ```
 
-Manual alternative - download from the `assets` release and extract at the repo root:
+Manual alternative - download from the `assets` release, extract at the repo root, then verify:
 
 ```bash
 tar -xzf assets.tar.gz                          # macOS / Linux
 Expand-Archive assets.zip -DestinationPath .    # Windows PowerShell
+python tools/assets.py check                    # verify assets/ matches assets.sha256
 ```
 
 If the repo has no GitHub remote yet, only a local bundle can be used - never delete `assets/`.
@@ -115,8 +116,14 @@ You cannot publish to the upstream repo's Release (no write access). Instead:
    tar -xzf assets.tar.gz
    ```
 
-2. `tools/pack-assets.sh` — the recomputed `assets.sha256` **must equal the PR's stamp**; a
-   mismatch means the bundle does not match the code.
+2. Verify the extracted `assets/` matches the PR's `assets.sha256` (never skip this — a mismatch
+   means the bundle does not match the code):
+
+   ```bash
+   python tools/assets.py stamp    # prints the recomputed content hash
+   ```
+
+   The printed hash **must equal the stamp shown in the PR diff**.
 3. `tools/push-assets.sh` to publish to the **upstream** `assets` Release (you have write access).
 4. `python tools/assets.py check`, run the tests, then merge.
 
