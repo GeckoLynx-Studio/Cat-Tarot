@@ -1,16 +1,14 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/dice_3d.gd" id="1_dice"]
 [ext_resource type="PackedScene" path="res://assets/models/dice_low_poly.glb" id="2_model"]
+[ext_resource type="Shader" path="res://scenes/dice_vertex_color.gdshader" id="3_shader"]
 
 [sub_resource type="BoxShape3D" id="Shape_die"]
 size = Vector3(0.82, 0.82, 0.82)
 
-[sub_resource type="StandardMaterial3D" id="Material_die"]
-metallic = 0.043636
-roughness = 0.412727
-cull_mode = 2
-vertex_color_use_as_albedo = true
+[sub_resource type="ShaderMaterial" id="Material_die"]
+shader = ExtResource("3_shader")
 
 [node name="Dice3D" type="Node3D"]
 script = ExtResource("1_dice")
@@ -19,6 +17,8 @@ script = ExtResource("1_dice")
 
 [node name="Model" parent="Pivot" instance=ExtResource("2_model")]
 transform = Transform3D(7, 0, 0, 0, 7, 0, 0, 0, 7, 0, 0, 0)
+
+[node name="Dice" parent="Pivot/Model" index="0"]
 surface_material_override/0 = SubResource("Material_die")
 
 [node name="Area3D" type="Area3D" parent="."]
