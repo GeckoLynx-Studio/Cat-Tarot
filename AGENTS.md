@@ -25,16 +25,27 @@ structure and keep **gameplay out of it** — rules, controls, walkthroughs and 
 
 ## Assets: download them first (after clone)
 
-`assets/` is **not** in Git. Restore it before running the project, tests or the editor:
+`assets/` is **not** in Git. Restore it, then import once before running the project, tests or the
+editor:
 
 ```bash
 tools/fetch-assets.sh                        # Linux / macOS / Git Bash
 powershell -File tools\fetch-assets.ps1      # Windows PowerShell
+godot --headless --path . --import           # rebuild .import sidecars + .godot/ cache
 ```
 
 The script uses a local `assets.tar.gz` / `assets.zip` if present, otherwise downloads the two
 archives from this repo's GitHub **Release tagged `assets`**, extracts to `assets/`, and verifies
 the committed `assets.sha256`. Requires Python 3.8+; `gh` only if the release is private.
+
+The bundle ships raw files only - `.import` sidecars and the `.godot/` cache are per-machine,
+git-ignored, and regenerated on import. If you pulled new code that adds a `class_name` and see
+`Identifier "..." not declared` or `No loader found for resource ...`, clear the stale cache and
+re-import:
+
+```bash
+rm -rf .godot && godot --headless --path . --import
+```
 
 Manual alternative - download from the `assets` release and extract at the repo root:
 

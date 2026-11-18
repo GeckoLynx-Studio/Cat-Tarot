@@ -53,6 +53,9 @@ godot --path .
 
 Debug seed: `godot --path . -- --seed=1234`.
 
+If you pull new assets or scripts and see `No loader found` / `Identifier "..." not declared`,
+clear the cache and re-import: `rm -rf .godot && godot --headless --path . --import`.
+
 Tests:
 
 ```bash
