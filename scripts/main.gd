@@ -60,12 +60,23 @@ func _ready() -> void:
 	restart_button.pressed.connect(_on_restart_pressed)
 	Loc.language_changed.connect(_on_language_changed)
 	_seed = _read_seed()
-	GameManager.new_game(_seed)
+	if TheatreSession.resume_requested:
+		if TheatreSession.restore_game():
+			_restore_table()
+		else:
+			TheatreSession.read_profile()
+			get_tree().change_scene_to_file.call_deferred("res://scenes/theatre_menu.tscn")
+	else:
+		GameManager.new_game(_seed)
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var key_event := event as InputEventKey
+		if key_event.pressed and not key_event.echo and key_event.keycode == KEY_ESCAPE:
+			TheatreSession.tracking = false
+			get_tree().change_scene_to_file("res://scenes/theatre_menu.tscn")
+			return
 		if key_event.pressed and not key_event.echo and key_event.keycode == KEY_R:
 			GameManager.new_game(_seed)
 
@@ -137,18 +148,10 @@ func _deal_card(request: Dictionary) -> void:
 	var pivot := Node3D.new()
 	pivot.position = card_root.to_local(deck.top_card_position())
 	card_root.add_child(pivot)
-	var card: Card3D = CARD_SCENE.instantiate()
-	pivot.add_child(card)
-	card.position = Vector3.ZERO
-	card.setup(card_id, _texture_for(card_id))
-	card.base_position = target
+	var card := _make_field_card(pivot, card_id, target, orientation)
 	card.scale = Vector3.ONE * 0.9
 	card.animation_locked = true
 	card.area.input_ray_pickable = false
-	card.set_effect_text(_effect_text(card_id, orientation))
-	card.clicked.connect(_on_card_clicked)
-	card.accept_pressed.connect(_on_card_accept)
-	card.refuse_pressed.connect(_on_card_refuse)
 	_slot_cards[slot] = card
 	Audio.play_sfx("card_draw", -4.0)
 	deck.draw_cards(1)
@@ -157,6 +160,35 @@ func _deal_card(request: Dictionary) -> void:
 	card.reparent(card_root, true)
 	pivot.queue_free()
 	await _animate_card_entry(card, target, orientation)
+
+
+func _make_field_card(parent: Node3D, id: int, target: Vector3, orientation: String) -> Card3D:
+	var card: Card3D = CARD_SCENE.instantiate()
+	parent.add_child(card)
+	card.setup(id, _texture_for(id))
+	card.base_position = target
+	card.set_effect_text(_effect_text(id, orientation))
+	card.clicked.connect(_on_card_clicked)
+	card.accept_pressed.connect(_on_card_accept)
+	card.refuse_pressed.connect(_on_card_refuse)
+	return card
+
+
+func _restore_table() -> void:
+	_on_game_started(GameManager.rng_seed)
+	deck.draw_cards(GameManager.TOTAL_CARDS - GameManager.deck.size())
+	for i in GameManager.field_cards.size():
+		var runtime: Variant = GameManager.field_cards[i]
+		if runtime == null or (not GameManager.pending_new_mark.is_empty() and i == GameManager.selected_slot):
+			continue
+		var target := _slot_position(i)
+		var card := _make_field_card(card_root, runtime.card_id, target, runtime.orientation)
+		card.position = target
+		card.set_state(runtime.orientation, false)
+		_slot_cards[i] = card
+	_rebuild_hand()
+	_on_state_changed()
+	GameManager.state_changed.emit()
 
 
 func _animate_card_draw(pivot: Node3D, card: Card3D, reveal_sound: bool = false) -> bool:

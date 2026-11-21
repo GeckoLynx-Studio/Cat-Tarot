@@ -59,6 +59,7 @@ Tests:
 godot --headless --path . res://tests/rules_test.tscn
 godot --headless --path . res://tests/ui_smoke.tscn
 godot --headless --path . res://tests/interactions_test.tscn
+godot --headless --path . res://tests/theatre_test.tscn
 ```
 
 ## Project layout

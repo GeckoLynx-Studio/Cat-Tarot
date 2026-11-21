@@ -125,7 +125,7 @@ const SVG_CRACK_FX := """
 
 @export var studio_title: String = "GeckoLynx"
 @export var studio_subtitle: String = "S t u d i o"
-@export var next_scene_path: String = "res://scenes/main.tscn"
+@export var next_scene_path: String = "res://scenes/theatre_menu.tscn"
 @export var auto_free_on_finish: bool = true
 @export var allow_skip: bool = true
 

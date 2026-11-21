@@ -1,6 +1,7 @@
 extends Node
 
 signal state_changed
+signal checkpoint_reached
 signal field_cards_changed(cards: Array)
 signal selected_card_changed(card_id: int, slot: int)
 signal choice_committed(accepted: bool, card_id: int, slot: int)
@@ -89,6 +90,7 @@ func new_game(seed_value: int = 0) -> void:
 	game_started.emit(rng_seed)
 	field_cards_changed.emit(field_cards.duplicate())
 	_emit_state()
+	checkpoint_reached.emit()
 
 
 func _make_runtime(card_id: int) -> Dictionary:
@@ -172,6 +174,7 @@ func select_card(card_id: int) -> void:
 	_log(Loc.tf("log.select", [Loc.card_name(card_id)]))
 	selected_card_changed.emit(card_id, slot)
 	_emit_state()
+	checkpoint_reached.emit()
 
 
 func select_slot(slot: int) -> void:
@@ -198,6 +201,7 @@ func roll_die() -> void:
 		if _apply_stat_delta(str(cost["minus"]), -1, "roll"):
 			return
 	_emit_state()
+	checkpoint_reached.emit()
 
 
 func accept_selected() -> void:
@@ -222,6 +226,7 @@ func accept_selected() -> void:
 		marks_changed.emit(marks.duplicate())
 		phase = Phase.RESOLVE
 		_emit_state()
+		checkpoint_reached.emit()
 		return
 	_add_mark(int(runtime["card_id"]), str(runtime["orientation"]))
 	_flow_new_mark_added(int(runtime["card_id"]))
@@ -646,6 +651,7 @@ func _finish_choice_resolution() -> void:
 		return
 	phase = Phase.SELECT
 	_emit_state()
+	checkpoint_reached.emit()
 
 
 func _enter_final_end() -> void:

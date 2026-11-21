@@ -21,6 +21,7 @@ boot_splash/show_image=false
 Audio="*res://scripts/audio_manager.gd"
 Loc="*res://scripts/loc.gd"
 GameManager="*res://scripts/game_manager.gd"
+TheatreSession="*res://scripts/theatre_session.gd"
 
 [display]
 

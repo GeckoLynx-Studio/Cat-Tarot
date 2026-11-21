@@ -41,6 +41,21 @@ Debug seed:
 godot --path . -- --seed=1234
 ```
 
+After the studio splash, the theatre opens. Click either ticket to start a play.
+The leather book resumes the last play, including a pending hand replacement.
+Starting from a ticket with a saved play asks before replacing it. Press
+`Esc` at the table to return to the theatre. Choices and rolls save as soon
+as their rules finish, including while their visual animation is playing.
+
+Open the wooden chest to browse the 22 cards. A card joins the gallery the
+first time it appears in the field. The World joins at the final reveal.
+The left, red fader controls music and the right, brown fader controls effects.
+Drag either grip or click its slot to set a level. The two percentage readouts
+and the gears respond immediately. Tab and the arrow keys also adjust the
+levels through the controls below the console. The desk bell opens the exit
+confirmation. Arrow keys or Tab focus menu props, Enter activates them, and
+Esc returns from a panel. Gallery and sound preferences carry between plays.
+
 The tabletop restart button starts a new random run. `R` restarts with the
 command-line seed.
 
@@ -326,7 +341,8 @@ Test coverage includes:
 - A card's highest/lowest condition uses fixed stat order for ties.
 - Strength reversed's once-per-run low-stat boost targets the lowest stat with the
   same fixed tie order.
-- No save/load or export preset is included.
+- The theatre keeps one active play in the local player profile. Completing a
+  play clears its checkpoint. The project has no export preset.
 - The card art keeps its printed English titles; localized names are used in the
   remaining UI text.
 - Source card filenames are preserved as supplied, including spaces.
