@@ -41,14 +41,50 @@ Debug seed:
 godot --path . -- --seed=1234
 ```
 
+To try the narrative prototype, launch with a question and start a new play from a ticket.
+
+```bash
+godot --path . -- "--question=What should I do next?"
+```
+
+Selecting a card shows its story preview. Accepting or refusing plays the chosen
+scene while the next set of branches is prepared. The local prototype uses
+scripted lines and stage cues. The book resumes the question, the choices already
+made, and any scene or ending that still needs to play. Use **Close the script**
+to finish an ending.
+
+### Agent API
+
+Open **Theatre settings → Agent console**. Pick a protocol and fill in its base
+URL and model ID. The default URLs point to the public services, and a compatible
+gateway can supply its own URL. Include the version prefix when the endpoint
+requires one. The game appends `/chat/completions` for OpenAI-compatible APIs,
+`/messages` for Anthropic, and `/models/{model}:generateContent` for Gemini.
+
+Enter a key or leave the field blank to use the corresponding `OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`, or `GEMINI_API_KEY` environment variable. Entered keys stay
+in memory for the session by default. The optional **Remember key** setting
+stores them in plaintext in the local `user://agent_api.cfg` file.
+
+**Send test request** uses the form as entered and validates a sample three-card
+round or finale. The console shows the JSON payload, the response, the HTTP
+status, and the elapsed time. Enable the Agent and save to use the selected
+profile in play. Starting a new play then prompts for a question.
+The configured endpoint receives the question and the story and rule context
+required for the scene. Gameplay has a local fallback for unavailable or
+invalid responses.
+
 After the studio splash, the theatre opens. Click either ticket to start a play.
 The leather book resumes the last play, including a pending hand replacement.
 Starting from a ticket with a saved play asks before replacing it. Press
 `Esc` at the table to return to the theatre. Choices and rolls save as soon
 as their rules finish, including while their visual animation is playing.
 
-Open the wooden chest to browse the 22 cards. A card joins the gallery the
-first time it appears in the field. The World joins at the final reveal.
+Hover over the wooden chest to open the lid and reveal a fan of cards above the
+deck. Click the chest to browse the 22 cards. The chest stays open and presents
+the selected card. Use Previous, Next, or the arrow keys to turn cards. A card
+joins the gallery the first time it appears in the field. The World joins at
+the final reveal.
 The left, red fader controls music and the right, brown fader controls effects.
 Drag either grip or click its slot to set a level. The two percentage readouts
 and the gears respond immediately. Tab and the arrow keys also adjust the
@@ -142,9 +178,9 @@ opening cards already show the orientations for that face.
 
 ### Death
 
-If any stat reaches `<= 0` or `>= 10`, the run ends immediately. There is no
-inheritance, no stat reset, and no mark loss. No end panel appears; the restart
-button on the table lights up with a pulsing halo instead.
+If any stat reaches `<= 0` or `>= 10`, the run ends immediately with the current
+stats and marks. The restart button lights up with a pulsing halo. A narrative
+play also shows a short ending.
 
 The d6/pip rolls are seeded. The final-trial missing-mark rule is intentionally
 skipped in this build.
@@ -189,10 +225,9 @@ because the final trial is currently skipped.
 ## Final World
 
 After 21 choices, The World card is drawn from the deck with the normal draw and
-entry animation; once it leaves the pile, the draw pile disappears. The run then
-ends directly. This is an intentional simplification: the final interpretation /
-Judgement check / missing mark payment is not executed in this build. No end
-panel appears; the tabletop restart button lights up with a pulsing halo.
+entry animation, and the draw pile disappears. The tabletop restart button
+lights up with a pulsing halo. In a narrative play, the ending addresses the
+opening question before the player can close the script.
 
 ## Assets and icons
 
@@ -341,8 +376,9 @@ Test coverage includes:
 - A card's highest/lowest condition uses fixed stat order for ties.
 - Strength reversed's once-per-run low-stat boost targets the lowest stat with the
   same fixed tie order.
-- The theatre keeps one active play in the local player profile. Completing a
-  play clears its checkpoint. The project has no export preset.
+- The theatre keeps one active play in the local player profile. A narrative
+  ending remains available in the book until the player closes the script.
+  The project has no export preset.
 - The card art keeps its printed English titles; localized names are used in the
   remaining UI text.
 - Source card filenames are preserved as supplied, including spaces.

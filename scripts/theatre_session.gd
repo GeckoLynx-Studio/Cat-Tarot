@@ -1,31 +1,67 @@
 extends Node
-## Player profile, including a checkpoint taken only when the rules wait for input.
+## Player profile and the shared rules/narrative checkpoint.
 
 const PROFILE_PATH := "user://theatre_profile.dat"
-const VERSION := 1
-const RUN_FIELDS := [
-	"stats", "die_value", "deck", "field_cards", "selected_slot", "selected_card",
-	"marks", "choices_completed", "refusals_total", "phase", "pending_new_mark",
-	"effect_queue", "flow", "flow_new_mark_card", "roll_cost_enabled", "rng_seed",
-]
+const NarrativePlan := preload("res://scripts/narrative_plan.gd")
+const VERSION := 2
 const BUS_NAMES := ["Music", "SFX"]
 
 var profile_path: String = PROFILE_PATH
 var checkpoint: Dictionary = {}
+var narrative: Dictionary = {}
 var collected: Array[int] = []
 var levels: Array[float] = [db_to_linear(Audio.MUSIC_BUS_DB), db_to_linear(Audio.SFX_BUS_DB)]
 var tracking: bool = false
 var resume_requested: bool = false
+var _enter_transition: Dictionary = {}
+var _return_transition: Dictionary = {}
+
+
+func begin_enter_transition(kind: String, cam_transform: Transform3D, cam_fov: float, curtains: Dictionary, question: String = "") -> void:
+	_return_transition.clear()
+	_enter_transition = {
+		"kind": kind,
+		"camera_transform": cam_transform,
+		"camera_fov": cam_fov,
+		"curtains": curtains,
+		"question": question,
+	}
+
+
+func consume_enter_transition() -> Dictionary:
+	if _enter_transition.is_empty():
+		return {}
+	var data := _enter_transition.duplicate(true)
+	_enter_transition.clear()
+	return data
+
+
+func begin_return_transition(cam_transform: Transform3D, cam_fov: float, curtains: Dictionary) -> void:
+	_enter_transition.clear()
+	_return_transition = {
+		"camera_transform": cam_transform,
+		"camera_fov": cam_fov,
+		"curtains": curtains,
+	}
+
+
+func consume_return_transition() -> Dictionary:
+	if _return_transition.is_empty():
+		return {}
+	var data := _return_transition.duplicate(true)
+	_return_transition.clear()
+	return data
 
 
 func _ready() -> void:
 	read_profile()
 	GameManager.checkpoint_reached.connect(_on_checkpoint)
-	GameManager.game_over.connect(_on_game_over)
+	GameManager.game_started.connect(_on_game_started)
 
 
 func read_profile() -> void:
 	checkpoint.clear()
+	narrative = {}
 	collected.clear()
 	levels.assign([db_to_linear(Audio.MUSIC_BUS_DB), db_to_linear(Audio.SFX_BUS_DB)])
 	var data := _read_file(profile_path)
@@ -41,6 +77,8 @@ func read_profile() -> void:
 	for i in levels.size():
 		_apply_level(i)
 	var saved: Dictionary = data.get("run", {})
+	if data.get("version") == 1 and not saved.is_empty():
+		_migrate_run(saved)
 	if _valid_run(saved):
 		checkpoint = saved
 
@@ -52,16 +90,16 @@ func _read_file(path: String) -> Dictionary:
 	if file == null or file.get_length() < 8 or file.get_length() > 1000000:
 		return {}
 	var data: Variant = file.get_var(false)
-	if data is Dictionary and data.get("version") == VERSION and data.get("run") is Dictionary and data.get("collected") is Array and data.get("levels") is Array:
+	if data is Dictionary and data.get("version") in [1, VERSION] and data.get("run") is Dictionary and data.get("collected") is Array and data.get("levels") is Array:
 		return data
 	return {}
 
 
 func _valid_run(run: Dictionary) -> bool:
-	for key: String in RUN_FIELDS:
+	for key: String in GameManager.CHECKPOINT_FIELDS:
 		if not run.has(key) or typeof(run[key]) != typeof(GameManager.get(key)):
 			return false
-	if not run.get("rng_state") is int or run.field_cards.size() != 3:
+	if not run.get("rng_state") is int or run.field_cards.size() != 3 or run.revision < 0:
 		return false
 	if run.die_value < 1 or run.die_value > 6 or run.selected_slot < -1 or run.selected_slot >= 3:
 		return false
@@ -77,9 +115,65 @@ func _valid_run(run: Dictionary) -> bool:
 	for id: Variant in run.deck:
 		if not id is int or id < 0 or id >= GameManager.TOTAL_CARDS:
 			return false
+	if run.marks.size() > GameManager.MAX_MARKS or not run.get("narrative", {}) is Dictionary:
+		return false
+	var story: Dictionary = run.get("narrative", {})
+	if not story.is_empty() and not _valid_narrative(story):
+		return false
 	if run.phase == GameManager.Phase.RESOLVE:
-		return _valid_card(run.pending_new_mark) and run.selected_slot >= 0
-	return run.phase == GameManager.Phase.SELECT and run.pending_new_mark.is_empty()
+		return _valid_card(run.pending_new_mark) and run.selected_slot >= 0 and run.marks.size() == GameManager.MAX_MARKS and _valid_pending_resolution(run._pending_resolution)
+	if not run.pending_new_mark.is_empty() or not run._pending_resolution.is_empty():
+		return false
+	if run.phase == GameManager.Phase.GAME_OVER:
+		return not story.is_empty() and not story["finale"].is_empty() and run.game_over_reason_key in ["reason.death", "reason.world_end"]
+	return run.phase == GameManager.Phase.SELECT
+
+
+func _valid_narrative(story: Dictionary) -> bool:
+	if not (
+		story.get("question") is String and not story["question"].is_empty()
+		and story.get("history") is Array and story.get("plan") is Dictionary
+		and story.get("beat") is Dictionary and story.get("finale") is Dictionary
+		and story.get("opened") is bool
+	):
+		return false
+	for key: String in ["beat", "finale"]:
+		if not story[key].is_empty() and not NarrativePlan.is_beat(story[key]):
+			return false
+	var plan: Dictionary = story["plan"]
+	if plan.is_empty():
+		return true
+	if not plan.get("revision") is int or not plan.get("branches") is Array:
+		return false
+	for branch: Variant in plan["branches"]:
+		if not _valid_card(branch) or not NarrativePlan.is_beat(branch.get("accept")) or not NarrativePlan.is_beat(branch.get("refuse")):
+			return false
+	return true
+
+
+func _valid_pending_resolution(result: Dictionary) -> bool:
+	return (
+		result.get("action") == "accept" and _valid_card(result)
+		and result.get("stats_before") is Dictionary
+		and result.get("stat_changes") is Array and result.get("effects") is Array
+	)
+
+
+func _migrate_run(run: Dictionary) -> void:
+	run["revision"] = 0
+	run["game_over_won"] = false
+	run["game_over_reason_key"] = ""
+	run["_pending_resolution"] = {}
+	if run.get("phase") != GameManager.Phase.RESOLVE:
+		return
+	var mark: Variant = run.get("pending_new_mark")
+	if not _valid_card(mark):
+		return
+	run["_pending_resolution"] = {
+		"action": "accept", "card_id": mark["card_id"], "orientation": mark["orientation"],
+		"slot": run.get("selected_slot", -1), "stats_before": run.get("stats", {}),
+		"stat_changes": [], "effects": [],
+	}
 
 
 func _valid_card(card: Variant) -> bool:
@@ -110,25 +204,29 @@ func write_profile() -> void:
 		push_error("Cannot install theatre profile")
 
 
+func save_checkpoint() -> void:
+	_on_checkpoint()
+
+
+func _on_game_started(_seed: int) -> void:
+	narrative = {}
+
+
 func _on_checkpoint() -> void:
 	if not tracking:
 		return
 	for card: Variant in GameManager.field_cards:
 		if card != null and not collected.has(int(card.card_id)):
 			collected.append(int(card.card_id))
-	var state := {"rng_state": GameManager.rng.state}
-	for key: String in RUN_FIELDS:
-		state[key] = GameManager.get(key)
-	checkpoint = state.duplicate(true)
-	write_profile()
-
-
-func _on_game_over(reason: String) -> void:
-	if not tracking:
-		return
-	if reason == "reason.world_end" and not collected.has(GameManager.WORLD_ID):
-		collected.append(GameManager.WORLD_ID)
-	checkpoint = {}
+	if GameManager.phase == GameManager.Phase.GAME_OVER:
+		if GameManager.game_over_won and not collected.has(GameManager.WORLD_ID):
+			collected.append(GameManager.WORLD_ID)
+		if narrative.is_empty() or narrative["finale"].is_empty():
+			checkpoint = {}
+			write_profile()
+			return
+	checkpoint = GameManager.capture_checkpoint()
+	checkpoint["narrative"] = narrative.duplicate(true)
 	write_profile()
 
 
@@ -136,15 +234,8 @@ func restore_game() -> bool:
 	resume_requested = false
 	if not _valid_run(checkpoint):
 		return false
-	for key: String in RUN_FIELDS:
-		GameManager.set(key, checkpoint[key])
-	# Keep the saved collections independent of subsequent mutations.
-	checkpoint = checkpoint.duplicate(true)
-	GameManager.rng.seed = GameManager.rng_seed
-	GameManager.rng.state = checkpoint.rng_state
-	GameManager.game_over_won = false
-	GameManager.game_over_reason_key = ""
-	GameManager.debug_forced_rolls.clear()
+	narrative = checkpoint.get("narrative", {}).duplicate(true)
+	GameManager.restore_checkpoint(checkpoint)
 	return true
 
 

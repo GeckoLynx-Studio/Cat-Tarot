@@ -5,6 +5,7 @@ signal splash_finished
 
 const SVG_HEADER := '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 400" width="500" height="400">'
 const SVG_FOOTER := "</svg>"
+const THEATRE_PATH := "res://scenes/theatre_menu.tscn"
 
 const SVG_BADGE := """
 <defs>
@@ -125,7 +126,7 @@ const SVG_CRACK_FX := """
 
 @export var studio_title: String = "GeckoLynx"
 @export var studio_subtitle: String = "S t u d i o"
-@export var next_scene_path: String = "res://scenes/theatre_menu.tscn"
+@export var next_scene_path: String = THEATRE_PATH
 @export var auto_free_on_finish: bool = true
 @export var allow_skip: bool = true
 
@@ -145,6 +146,10 @@ var _finished: bool = false
 
 
 func _ready() -> void:
+	if not next_scene_path.is_empty():
+		ResourceLoader.load_threaded_request(next_scene_path, "PackedScene")
+	if next_scene_path == THEATRE_PATH:
+		TablePreloader.begin_load()
 	layer = 100
 	_build_nodes()
 	_play_intro_sequence()
@@ -296,9 +301,10 @@ func _play_intro_sequence() -> void:
 	_tween.parallel().tween_property(_title_label, "modulate:a", 1.0, 0.45).set_delay(1.20).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_tween.parallel().tween_property(_sub_label, "modulate:a", 1.0, 0.50).set_delay(1.36).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
-	# Stage 5 (2.55s): Hold then dissolve into main scene
+	# Hold the logo until the incoming scene can be drawn behind it.
 	_tween.tween_interval(0.85)
-	_tween.tween_property(_root, "modulate:a", 0.0, 0.42).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	if next_scene_path.is_empty():
+		_tween.tween_property(_root, "modulate:a", 0.0, 0.42).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	_tween.tween_callback(_on_sequence_complete)
 
 
@@ -334,6 +340,49 @@ func _on_sequence_complete() -> void:
 	_finished = true
 	splash_finished.emit()
 	if not next_scene_path.is_empty():
-		get_tree().change_scene_to_file(next_scene_path)
+		_open_next_scene()
 	elif auto_free_on_finish:
 		queue_free()
+
+
+func _open_next_scene() -> void:
+	var tree := get_tree()
+	if next_scene_path == THEATRE_PATH and not TablePreloader.finished:
+		TablePreloader.prepare()
+		await TablePreloader.preparation_finished
+	var status := ResourceLoader.load_threaded_get_status(next_scene_path)
+	while status == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+		await tree.process_frame
+		status = ResourceLoader.load_threaded_get_status(next_scene_path)
+	var next_scene: PackedScene
+	if status == ResourceLoader.THREAD_LOAD_LOADED:
+		next_scene = ResourceLoader.load_threaded_get(next_scene_path) as PackedScene
+	else:
+		next_scene = load(next_scene_path) as PackedScene
+	if next_scene == null:
+		push_error("Could not load the scene after the studio splash")
+		return
+
+	# Swap before the frame is processed, leaving a cover through the first rendered frame.
+	await tree.process_frame
+	var cover: SplashCover
+	if DisplayServer.get_name() != "headless":
+		cover = SplashCover.new()
+		cover.layer = 10
+		tree.root.add_child(cover)
+		_root.reparent(cover, false)
+	if tree.change_scene_to_packed(next_scene) == OK:
+		if cover != null:
+			cover.dissolve(_root)
+	elif cover != null:
+		_root.reparent(self, false)
+		cover.queue_free()
+
+
+class SplashCover extends CanvasLayer:
+	func dissolve(logo: Control) -> void:
+		await get_tree().scene_changed
+		await RenderingServer.frame_post_draw
+		var fade := create_tween()
+		fade.tween_property(logo, "modulate:a", 0.0, 0.42).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		fade.tween_callback(queue_free)

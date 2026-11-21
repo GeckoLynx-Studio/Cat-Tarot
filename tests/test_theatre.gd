@@ -59,8 +59,27 @@ func _run() -> void:
 	_check(menu.mode == "quit", "bell confirmation")
 	menu._close_panel()
 	menu._open_gallery()
-	_check(menu.gallery_image.texture.resource_path.ends_with("card_back.svg"), "unseen card remains covered")
+	await tree.create_timer(0.55).timeout
+	var display: Node3D = menu.stage.gallery_display
+	var initial_card: Card3D = display.presented_card
+	_check(is_instance_valid(initial_card), "the gallery draws a physical card from the chest")
+	_check(initial_card.front.material_override.albedo_texture.resource_path.ends_with("card_back.svg"), "unseen card remains covered")
+	_check(is_equal_approx(menu.stage.gallery_lid.rotation_degrees.x, TheatreSet.GALLERY_LID_OPEN_X), "gallery panel keeps the chest open")
+	_check(not menu.stage.gallery_preview_cards[0].visible, "the physical card takes the place of the hover fan")
+	var initial_position := initial_card.position
+	TheatreSession.collected.append(2)
+	menu._turn_card(1)
+	await tree.create_timer(0.24).timeout
+	_check(display.presented_card == initial_card and not initial_card.position.is_equal_approx(initial_position), "the outgoing card moves before the description changes")
+	menu._turn_card(1)
+	await tree.create_timer(1.2).timeout
+	_check(display.presented_card.card_id == 2, "rapid input presents the last requested card")
+	_check(menu.card_title.text == Loc.card_name(2) and display.presented_card.front.material_override.albedo_texture.resource_path == CardDatabase.texture_path(2), "card art and description agree after the draw")
+	_check(menu.card_description.text.contains(Loc.orientation_name("upright")) and menu.card_description.text.contains(Loc.orientation_name("reversed")), "the description uses the card's localized effects")
+	TheatreSession.collected.clear()
 	menu._close_panel()
+	await tree.create_timer(0.4).timeout
+	_check(display.presented_card == null and is_zero_approx(menu.stage.gallery_lid.rotation_degrees.x), "closing the gallery puts the card away and shuts the chest")
 	menu._open_settings()
 	await tree.create_timer(.9).timeout
 	var knob: Node3D = menu.stage.sliders[0]

@@ -1,15 +1,17 @@
 extends Node3D
 
-const TABLE := "res://scenes/main.tscn"
 const HOME := Vector3(0, 3.94, 13.1)
 const AIM := Vector3(0, 1.70, 0)
+const HOME_FOV := 31.1
 const NAMES := ["gallery", "start", "continue", "settings", "quit"]
+const CARD_BACK := preload("res://assets/models/theatre/card_back.svg")
+const AgentConsole := preload("res://scripts/agent_console.gd")
 
 @onready var stage: TheatreSet = $Set
 @onready var camera: Camera3D = $Camera3D
 var focused := -1
 var mode := ""
-var gallery_card := 0
+var _gallery_requested := 0
 var dragging := -1
 var grab_offset := 0.0
 var dock_dragging := -1
@@ -18,7 +20,6 @@ var screen := Control.new()
 var panel: PanelContainer
 var content: VBoxContainer
 var hint := Label.new()
-var gallery_image: TextureRect
 var card_title: Label
 var card_description: Label
 var counter: Label
@@ -29,15 +30,39 @@ var last_mouse := Vector2(-10000,-10000)
 var camera_target := AIM
 var camera_home := HOME
 var pointer := Vector2.ZERO
-var previous_msaa: Viewport.MSAA
 
 
 func _ready() -> void:
 	TheatreSession.tracking = false
-	previous_msaa = get_viewport().msaa_3d
-	get_viewport().msaa_3d = Viewport.MSAA_4X
+	TablePreloader.begin_load()
+	transitioning = false
+	keyboard_focus = false
+	_set_focus(-1)
+	camera_home = HOME
+	camera_target = AIM
+	pointer = Vector2.ZERO
 	camera.position = HOME
 	camera.look_at(AIM)
+	camera.fov = HOME_FOV
+	var ret := TheatreSession.consume_return_transition()
+	if not ret.is_empty():
+		camera.global_transform = ret["camera_transform"]
+		camera.fov = float(ret["camera_fov"])
+		stage.restore_curtains(ret.get("curtains", {}))
+		stage.set_curtains_open(false, true, 0.60)
+		stage.set_gameplay_lighting(true, false)
+		stage.set_gameplay_lighting(false, true, 0.72)
+		stage.play_return_props_animation(0.72)
+		create_tween().tween_callback(TablePreloader.prepare).set_delay(0.72)
+	else:
+		TablePreloader.prepare()
+	if screen.get_parent() == null:
+		_build_interface()
+	Audio.start_music()
+
+
+func _build_interface() -> void:
+	stage.gallery_display.card_presented.connect(_show_gallery_description)
 	var optics := CameraAttributesPractical.new()
 	optics.dof_blur_far_enabled = RenderingServer.get_current_rendering_method() != "gl_compatibility"
 	optics.dof_blur_far_distance = HOME.distance_to(AIM) + 2.0
@@ -59,11 +84,9 @@ func _ready() -> void:
 	hint.add_theme_constant_override("outline_size",5)
 	hint.offset_top = -44
 	hint.offset_bottom = -15
-	Audio.start_music()
 
 
 func _exit_tree() -> void:
-	get_viewport().msaa_3d = previous_msaa
 	_end_drag()
 	if dock_dragging >= 0:
 		_end_dock_drag(false,dock_dragging)
@@ -78,7 +101,7 @@ func _process(delta: float) -> void:
 		keyboard_focus = false
 	if mode.is_empty() and not transitioning and not keyboard_focus and get_viewport().get_visible_rect().has_point(mouse):
 		_set_focus(_pick(mouse))
-	var desired := mouse / size * 2.0 - Vector2.ONE if mode.is_empty() and not keyboard_focus and get_viewport().get_visible_rect().has_point(mouse) else Vector2.ZERO
+	var desired := mouse / size * 2.0 - Vector2.ONE if mode.is_empty() and not transitioning and not keyboard_focus and get_viewport().get_visible_rect().has_point(mouse) else Vector2.ZERO
 	desired = desired.clamp(-Vector2.ONE,Vector2.ONE)
 	var blend := 1.0-exp(-delta*6.8)
 	pointer = pointer.lerp(desired,blend)
@@ -87,6 +110,7 @@ func _process(delta: float) -> void:
 	var target_basis := Basis.looking_at((camera_target-camera.position).normalized(), Vector3.UP)
 	target_basis = target_basis * Basis.from_euler(Vector3(deg_to_rad(pointer.y*1.2), deg_to_rad(-pointer.x*1.2), 0))
 	camera.basis = camera.basis.slerp(target_basis,blend).orthonormalized()
+	camera.fov = lerpf(camera.fov, HOME_FOV, blend)
 	var optics := camera.attributes as CameraAttributesPractical
 	optics.dof_blur_far_distance = lerpf(optics.dof_blur_far_distance,camera.position.distance_to(camera_target)+1.35,blend)
 	var tilt := Vector3(-12,4,6)
@@ -129,6 +153,11 @@ func _set_focus(id: int) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if mode == "gallery" and event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode in [KEY_LEFT, KEY_RIGHT]:
+			_turn_card(-1 if event.keycode == KEY_LEFT else 1)
+			get_viewport().set_input_as_handled()
+			return
 	if mode == "settings" and event is InputEventKey and event.pressed:
 		keyboard_focus = true
 	if dragging < 0:
@@ -147,6 +176,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		if mode.is_empty():
 			_activate(TheatreSet.QUIT)
+		elif mode == "agent":
+			_open_settings()
 		else:
 			_close_panel()
 		get_viewport().set_input_as_handled()
@@ -172,9 +203,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			keyboard_focus = true
 			_set_focus(posmod(focused+step,5) if focused >= 0 else TheatreSet.START)
 			get_viewport().set_input_as_handled()
-	elif mode == "gallery" and event.keycode in [KEY_LEFT,KEY_RIGHT]:
-		_turn_card(-1 if event.keycode==KEY_LEFT else 1)
-		get_viewport().set_input_as_handled()
 
 
 func _activate(id: int) -> void:
@@ -202,20 +230,63 @@ func _activate(id: int) -> void:
 			_confirmation("quit")
 
 
-func _enter_game(resume: bool) -> void:
+func _enter_game(resume: bool, question: String = "") -> void:
 	if transitioning:
 		return
+	if not resume and AgentSettings.enabled and question.is_empty():
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--question="):
+				question = arg.trim_prefix("--question=").strip_edges()
+				break
+		if question.is_empty():
+			_open_question()
+			return
 	transitioning = true
 	_close_panel()
+	stage.set_gallery_open(true)
 	TheatreSession.resume_requested = resume
 	TheatreSession.tracking = true
 	if resume:
 		var flip := create_tween()
 		flip.tween_property(stage.cover,"rotation:x",deg_to_rad(-34),.25)
-	for curtain in stage.curtains:
-		create_tween().set_trans(Tween.TRANS_SINE).tween_property(curtain,"scale:x",.12,.42)
-	await get_tree().create_timer(.44).timeout
-	get_tree().change_scene_to_file(TABLE)
+	var lift := create_tween().set_parallel(true).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	lift.tween_property(self, "camera_home", HOME + Vector3(0.0, 0.20, -0.35), 0.42)
+	lift.tween_property(self, "camera_target", AIM + Vector3(0.0, -0.15, 0.35), 0.42)
+	stage.set_curtains_open(true, true, 0.65)
+	var tree := get_tree()
+	await tree.create_timer(.44).timeout
+	if not is_inside_tree():
+		return
+	if not TablePreloader.finished:
+		TablePreloader.prepare()
+		await TablePreloader.preparation_finished
+	await tree.process_frame
+	var table := TablePreloader.take_table()
+	if table == null:
+		_restore_menu_after_failed_entry()
+		return
+
+	stage.set_gallery_open(true, false)
+	TheatreSession.begin_enter_transition("continue" if resume else "start", camera.global_transform, camera.fov, stage.capture_curtains(), question)
+	TablePreloader.keep_menu(self)
+	if tree.change_scene_to_node(table) != OK:
+		table.queue_free()
+		TheatreSession.consume_enter_transition()
+		var menu := TablePreloader.take_menu()
+		tree.root.add_child(menu)
+		tree.current_scene = menu
+		_restore_menu_after_failed_entry()
+
+
+func _restore_menu_after_failed_entry() -> void:
+	TheatreSession.resume_requested = false
+	TheatreSession.tracking = false
+	transitioning = false
+	camera_home = HOME
+	camera_target = AIM
+	stage.set_gallery_open(false)
+	stage.set_curtains_open(false, true)
+	push_error("Could not open the tarot table")
 
 
 func _open_panel(kind: String, at_right: bool = false) -> void:
@@ -251,6 +322,8 @@ func _open_panel(kind: String, at_right: bool = false) -> void:
 
 
 func _close_panel() -> void:
+	if mode == "gallery":
+		stage.set_gallery_browsing(false)
 	_end_drag()
 	if dock_dragging >= 0:
 		_end_dock_drag(false,dock_dragging)
@@ -308,19 +381,16 @@ func _leave_theatre() -> void:
 
 func _open_gallery() -> void:
 	_open_panel("gallery",true)
+	stage.set_gallery_browsing(true)
 	var chest := stage.props[TheatreSet.GALLERY].position
 	camera_target = chest + Vector3(.60,.47,.0)
-	camera_home = camera_target+Vector3(0,1.52,4.50)
+	camera_home = camera_target + Vector3(0.0, 1.62, 4.90)
 	_label(content,Loc.t("theatre.gallery"),27)
-	gallery_image = TextureRect.new()
-	gallery_image.custom_minimum_size = Vector2(0,205)
-	gallery_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	gallery_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	content.add_child(gallery_image)
 	card_title = _label(content,"",23)
 	card_description = _label(content,"",17)
 	card_description.custom_minimum_size.x = 306
 	card_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	card_description.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	counter = _label(content,"",16)
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -328,17 +398,27 @@ func _open_gallery() -> void:
 	_button(row,"prev",_turn_card.bind(-1))
 	_button(row,"back",_close_panel).grab_focus()
 	_button(row,"next",_turn_card.bind(1))
-	gallery_card = 0 if TheatreSession.collected.is_empty() else TheatreSession.collected[0]
+	_gallery_requested = 0 if TheatreSession.collected.is_empty() else TheatreSession.collected[0]
+	_show_gallery_description(_gallery_requested)
 	_turn_card(0)
 
 
 func _turn_card(amount: int) -> void:
-	gallery_card = posmod(gallery_card+amount,GameManager.WORLD_ID+1)
-	var unlocked := TheatreSession.collected.has(gallery_card)
-	gallery_image.texture = load(CardDatabase.texture_path(gallery_card)) if unlocked else preload("res://assets/models/theatre/card_back.svg")
-	card_title.text = Loc.card_name(gallery_card) if unlocked else Loc.t("theatre.unseen")
-	card_description.text = Loc.card_desc(gallery_card) if unlocked else Loc.t("theatre.discover")
-	counter.text = "%02d / 22    ·    %s %d / 22" % [gallery_card+1, Loc.t("theatre.collected"), TheatreSession.collected.size()]
+	_gallery_requested = posmod(_gallery_requested + amount, GameManager.WORLD_ID + 1)
+	var texture := CARD_BACK as Texture2D
+	if TheatreSession.collected.has(_gallery_requested):
+		texture = load(CardDatabase.texture_path(_gallery_requested)) as Texture2D
+	stage.gallery_display.show_card(_gallery_requested, texture, amount)
+
+
+func _show_gallery_description(card_id: int) -> void:
+	if mode != "gallery":
+		return
+	var unlocked := TheatreSession.collected.has(card_id)
+	card_title.text = Loc.card_name(card_id) if unlocked else Loc.t("theatre.unseen")
+	card_description.text = Loc.card_desc(card_id) if unlocked else Loc.t("theatre.discover")
+	card_description.visible = not card_description.text.is_empty()
+	counter.text = "%02d / 22    ·    %s %d / 22" % [card_id + 1, Loc.t("theatre.collected"), TheatreSession.collected.size()]
 
 
 func _open_settings() -> void:
@@ -377,6 +457,45 @@ func _open_settings() -> void:
 			slider.grab_focus()
 	var back := _button(row,"back",_close_panel)
 	back.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_button(content, "agent_console", _open_agent_console)
+
+
+func _open_agent_console() -> void:
+	_close_panel()
+	mode = "agent"
+	_set_focus(-1)
+	panel = AgentConsole.new()
+	screen.add_child(panel)
+	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	panel.offset_left = 54.0
+	panel.offset_right = -54.0
+	panel.offset_top = 32.0
+	panel.offset_bottom = -32.0
+	panel.close_requested.connect(_open_settings)
+
+
+func _open_question() -> void:
+	_open_panel("question")
+	_label(content, Loc.t("theatre.ask_question"), 23)
+	var input := LineEdit.new()
+	input.custom_minimum_size.x = 440
+	input.max_length = 240
+	content.add_child(input)
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_child(actions)
+	_button(actions, "back", _close_panel)
+	var start := _button(actions, "start", func() -> void:
+		if not input.text.strip_edges().is_empty():
+			_enter_game(false, input.text.strip_edges())
+	)
+	start.disabled = true
+	input.text_changed.connect(func(value: String) -> void: start.disabled = value.strip_edges().is_empty())
+	input.text_submitted.connect(func(value: String) -> void:
+		if not value.strip_edges().is_empty():
+			_enter_game(false, value.strip_edges())
+	)
+	input.grab_focus()
 
 
 func _show_level(id: int, value: float) -> void:

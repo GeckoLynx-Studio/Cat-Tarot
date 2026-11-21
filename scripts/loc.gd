@@ -10,6 +10,8 @@ const TEXTS := {
 		"theatre.start": "开始演出",
 		"theatre.continue": "继续剧目",
 		"theatre.settings": "剧场设置",
+		"theatre.agent_console": "Agent 控制台",
+		"theatre.ask_question": "你想问塔罗什么？",
 		"theatre.quit": "离开剧场",
 		"theatre.no_run": "暂无可继续的剧目",
 		"theatre.back": "返回",
@@ -261,6 +263,8 @@ const TEXTS := {
 		"theatre.start": "Start play",
 		"theatre.continue": "Continue the play",
 		"theatre.settings": "Theatre settings",
+		"theatre.agent_console": "Agent console",
+		"theatre.ask_question": "What would you like to ask the cards?",
 		"theatre.quit": "Leave theatre",
 		"theatre.no_run": "No performance to continue",
 		"theatre.back": "Back",
@@ -546,7 +550,16 @@ func card_desc(card_id: int) -> String:
 	var card := CardDatabase.get_card(card_id)
 	if card.is_empty():
 		return ""
-	return str(card.get("desc_" + language, card.get("desc_en", "")))
+	var description := str(card.get("desc_" + language, card.get("desc_en", "")))
+	if not description.is_empty():
+		return description
+	var entries: PackedStringArray = []
+	for orientation: String in ["upright", "reversed"]:
+		var data := CardDatabase.orientation_data(card_id, orientation)
+		var text := str(data.get("mark_text_" + language, data.get("mark_text_en", "")))
+		if not text.is_empty():
+			entries.append("%s\n%s" % [orientation_name(orientation), text])
+	return "\n\n".join(entries)
 
 
 func stat_name(stat: String) -> String:
