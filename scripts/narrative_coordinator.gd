@@ -5,7 +5,9 @@ signal beat_requested(beat: Dictionary, finale: bool)
 signal plan_ready
 
 const Plan := preload("res://scripts/narrative_plan.gd")
+const Skills := preload("res://scripts/narrative_skills.gd")
 const REQUEST_TIMEOUT := 3.0
+const FINALE_GRACE := 3.0
 const MAX_QUESTION := 240
 
 ## Optional provider receives a detached context and a completion Callable(Dictionary).
@@ -37,6 +39,7 @@ func begin(question: String) -> void:
 		"opened": false, "finale_ready": false,
 	}
 	_request_plan(GameManager.rules_context())
+	_show_opening_wait()
 
 
 func resume() -> void:
@@ -48,14 +51,15 @@ func resume() -> void:
 	_present()
 	var state := GameManager.rules_context()
 	if state["terminal"] and not story["beat"].is_empty() and not story.get("finale_ready", false):
+		_request_plan(state, story.get("last_resolution", {}))
+	if not state["terminal"] and GameManager.phase == GameManager.Phase.SELECT and (not story["plan"].get("ready", false) or not story["opened"]):
 		_request_plan(state)
-	if not state["terminal"] and GameManager.phase == GameManager.Phase.SELECT and not story["plan"].get("ready", false):
-		_request_plan(state)
+		_show_opening_wait()
 
 
 func is_playing() -> bool:
 	var story := TheatreSession.narrative
-	return not story.is_empty() and (not story["beat"].is_empty() or not story["finale"].is_empty())
+	return not story.is_empty() and (not story["beat"].is_empty() or not story["finale"].is_empty() or _waiting_for_opening())
 
 
 func preview_for(card_id: int) -> String:
@@ -102,15 +106,22 @@ func _on_turn_resolved(result: Dictionary) -> void:
 	if action != "roll":
 		story["opened"] = true
 		var beat := _chosen_beat(result)
+		beat["consequence"] = Plan.consequence(result, Loc.language)
+		if state["choice_limit"] == GameManager.STORY_CHOICES:
+			beat["act_number"] = int(state["choices_completed"])
+			record["act_number"] = beat["act_number"]
 		story["beat"] = beat
 		record["line"] = beat["line"]
 		story["history"].append(record)
+	story["last_resolution"] = record
 	story["plan"] = {}
 	if state["terminal"]:
 		story["finale"] = Plan.fallback(_context(state, record))["finale"]
+		story["finale_act"] = Skills.act_number(state, action)
 		if action == "roll":
 			var line := "骰子停下了。猫望向失衡的刻度。" if Loc.language == "zh" else "The die comes to rest. The cat looks toward the scale that tipped."
-			story["beat"] = {"cue": "tense", "line": line}
+			story["beat"] = {"cue": "tense", "line": line, "consequence": Plan.consequence(result, Loc.language)}
+			story["beat"]["act_number"] = story["finale_act"]
 	_present()
 	_request_plan(state, record)
 
@@ -122,7 +133,10 @@ func _chosen_beat(result: Dictionary) -> Dictionary:
 		for branch: Dictionary in plan["branches"]:
 			if branch["card_id"] == result["card_id"] and branch["orientation"] == result["orientation"]:
 				return branch[result["action"]].duplicate()
-	var state := {"terminal": false, "options": [result]}
+	var state: Dictionary = result["state"].duplicate()
+	state["terminal"] = false
+	state["choices_completed"] -= 1
+	state["options"] = [result]
 	var fallback := Plan.fallback(_context(state, {}))
 	return fallback["branches"][0][result["action"]]
 
@@ -136,6 +150,8 @@ func _context(state: Dictionary, last: Dictionary) -> Dictionary:
 	return {
 		"question": story["question"], "language": Loc.language,
 		"history": story["history"], "state": state, "last_resolution": last,
+		"opening_scene": story.get("opening_scene", ""), "opening_anchor": story.get("opening_anchor", ""),
+		"local_opening": story.get("local_opening", false),
 	}.duplicate(true)
 
 
@@ -169,19 +185,30 @@ func _receive_plan(plan: Dictionary, request_id: int, context: Dictionary) -> vo
 	var story := TheatreSession.narrative
 	if state["revision"] != GameManager.revision or not is_inside_tree():
 		return
-	if not Plan.is_valid(plan, state):
+	var local := not provider.is_valid() or not Plan.is_valid(plan, state)
+	if local:
 		plan = Plan.fallback(context)
 	if state["terminal"]:
 		if not _finale_visible:
 			story["finale"] = _copy_beat(plan["finale"])
 			story["finale_ready"] = true
+			if story["beat"].is_empty():
+				_present()
 	elif GameManager.phase == GameManager.Phase.SELECT:
 		_store_branches(plan, state["revision"], true)
 		if not story["opened"]:
 			story["opened"] = true
 			var opening: Dictionary = plan.get("opening", {})
+			if opening.is_empty() and GameManager.choice_limit == GameManager.STORY_CHOICES:
+				opening = Plan.fallback(context)["opening"]
+				local = true
 			if not opening.is_empty():
+				story["opening_scene"] = opening["line"]
+				var anchor: Variant = opening.get("anchor", "")
+				story["opening_anchor"] = anchor.strip_edges().left(Plan.MAX_ANCHOR) if anchor is String else ""
+				story["local_opening"] = local
 				story["beat"] = _copy_beat(opening)
+				story["beat"]["is_opening"] = true
 				_present()
 		plan_ready.emit()
 	TheatreSession.save_checkpoint()
@@ -213,10 +240,32 @@ func _copy_beat(beat: Dictionary) -> Dictionary:
 	return {"cue": beat["cue"], "line": beat["line"]}
 
 
+func _waiting_for_opening() -> bool:
+	return GameManager.choice_limit == GameManager.STORY_CHOICES and not TheatreSession.narrative.get("opened", true)
+
+
+func _show_opening_wait() -> void:
+	if provider.is_valid() and _waiting_for_opening():
+		var line := "剧场正在为这个问题准备开场……" if Loc.language == "zh" else "The theatre is setting the scene for this question…"
+		beat_requested.emit({"line": line, "cue": "quiet", "heading": Skills.heading(1), "waiting": true}, false)
+
+
 func _present() -> void:
 	var story := TheatreSession.narrative
 	if not story["beat"].is_empty():
-		beat_requested.emit(story["beat"].duplicate(), false)
+		var beat: Dictionary = story["beat"].duplicate()
+		if GameManager.choice_limit == GameManager.STORY_CHOICES:
+			beat["heading"] = Skills.heading(int(beat.get("act_number", maxi(1, GameManager.choices_completed))))
+		beat_requested.emit(beat, false)
 	elif not story["finale"].is_empty():
+		var heading := Skills.heading(int(story.get("finale_act", Skills.act_number(GameManager.rules_context()))))
+		if GameManager.choice_limit == GameManager.STORY_CHOICES and _expire.is_valid() and not story.get("finale_ready", false):
+			if _deadline.time_left > FINALE_GRACE:
+				_deadline.start(FINALE_GRACE)
+			var line := "猫在幕边写下最后一句……" if Loc.language == "zh" else "The cat writes its last line by the curtain…"
+			beat_requested.emit({"line": line, "cue": "quiet", "heading": heading, "waiting": true}, false)
+			return
 		_finale_visible = true
-		beat_requested.emit(story["finale"].duplicate(), true)
+		var finale: Dictionary = story["finale"].duplicate()
+		finale["heading"] = heading
+		beat_requested.emit(finale, true)

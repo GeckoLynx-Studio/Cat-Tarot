@@ -4,6 +4,7 @@ extends PanelContainer
 signal close_requested
 
 const Client := preload("res://scripts/agent_client.gd")
+const Skills := preload("res://scripts/narrative_skills.gd")
 const PROVIDER_NAMES := ["OpenAI-compatible", "Anthropic Messages", "Gemini GenerateContent"]
 
 var _client := Client.new()
@@ -93,7 +94,8 @@ func _build() -> void:
 	_question.text = _text("我下一步该怎么走？", "What should I do next?")
 	var actions := HBoxContainer.new()
 	debug.add_child(actions)
-	_fixture.add_item(_text("三牌回合", "Three-card round"))
+	for i in GameManager.STORY_CHOICES:
+		_fixture.add_item(Skills.heading(i + 1))
 	_fixture.add_item(_text("终幕回答", "Finale"))
 	actions.add_child(_fixture)
 	_send.text = _text("发送测试请求", "Send test request")
@@ -154,7 +156,7 @@ func _test() -> void:
 	if not error.is_empty():
 		_status.text = error
 		return
-	var fixture := _test_context(_fixture.selected == 1)
+	var fixture := _test_context(_fixture.selected)
 	var request := Client.request_data(profile, fixture)
 	var preview := "POST %s\n\n%s" % [request["url"], JSON.stringify(request["payload"], "  ")]
 	var key: String = profile["api_key"]
@@ -172,19 +174,25 @@ func _show_result(result: Dictionary) -> void:
 	_response.text = JSON.stringify(result["plan"], "  ") if not result["plan"].is_empty() else result["raw"]
 
 
-func _test_context(finale: bool) -> Dictionary:
+func _test_context(index: int) -> Dictionary:
+	var completed := clampi(index, 0, GameManager.STORY_CHOICES)
+	var finale := completed == GameManager.STORY_CHOICES
 	var options: Array[Dictionary] = []
 	if not finale:
 		for id in 3:
 			var data := CardDatabase.orientation_data(id, "upright")
 			options.append({"slot": id, "card_id": id, "orientation": "UPRIGHT", "accept": data.get("accept", []), "refuse": data.get("refuse", [])})
 	var history: Array[Dictionary] = []
-	if finale:
-		history.append({"card_id": 0, "orientation": "UPRIGHT", "action": "accept", "line": _text("猫走出幕布，向第一次机会迈了一步。", "The cat stepped out from the curtain and took its first chance.")})
+	for i in completed:
+		var id := i + 3
+		history.append({
+			"act_number": i + 1, "card_id": id, "orientation": "UPRIGHT", "action": "accept",
+			"line": Skills.fallback_line(i + 1, "accept", Loc.card_name(id), Loc.language),
+		})
 	return {
 		"language": Loc.language, "question": _question.text.strip_edges(), "history": history, "last_resolution": {},
 		"state": {
-			"revision": 21 if finale else 0, "choices_completed": 21 if finale else 0, "options": options,
+			"revision": completed, "choices_completed": completed, "choice_limit": GameManager.STORY_CHOICES, "options": options,
 			"marks": [], "die_value": 1, "stats": {"passion": 4, "intuition": 4, "curiosity": 4, "comfort": 4},
 			"terminal": finale, "won": finale, "reason": "reason.world_end" if finale else "",
 		},

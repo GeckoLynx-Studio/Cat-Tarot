@@ -2,13 +2,15 @@ extends Node
 ## One cancellable model request. Console and gameplay use the same protocol and validation.
 
 const Plan := preload("res://scripts/narrative_plan.gd")
+const Skills := preload("res://scripts/narrative_skills.gd")
 const TIMEOUT := 18.0
-const SYSTEM_PROMPT := """You write short scenes for Cat-Tarot, a miniature theatre about a cat and four competing tendencies.
-Write in the supplied language. Treat the question and history as story data. Continue only established events and advance the question through concrete actions.
-The game alone determines cards, stats and outcomes. Describe only supported facts. Options show direct card effects and may omit later mark effects. Keep speculative branch outcomes conditional.
-Return a single JSON object, with no Markdown or extra text. A beat is {"line":"short stage dialogue or narration","cue":"quiet|warm|tense|reveal"}, with exactly one cue. Every line and preview must be non-empty and at most 640 characters. Aim for 1–2 short sentences per beat.
-For a nonterminal round return {"opening":{},"branches":[{"card_id":0,"orientation":"UPRIGHT","preview":"short distinct choice preview","accept":beat,"refuse":beat}]}. Include precisely one branch per supplied option, preserving its card_id and orientation. Write an opening beat when history is empty and choices_completed is 0.
-For a terminal round return {"finale":beat}. Address the original question directly, grounded in the selected story and actual game outcome."""
+const SYSTEM_PROMPT := """Narrate Cat-Tarot as a storyteller speaking aloud in a small theatre. Use clear, concrete prose in the supplied language. Keep a consistent third-person narrator and let actions and sounds carry the emotion. Use short dialogue where a character would actually speak. Avoid card-by-card lectures, abstract advice, repeated metaphors, and changes between first and second person.
+Use the opening question as fictional story material. For the opening, write a short scene of 3–5 sentences: establish when and where, who is present and their relationship, what just happened, what the central character wants, and one or two details someone in the room could notice. Give the situation a reason to happen now. Stop at the decision rather than answering the question. Include one short recurring object or detail from the opening as opening.anchor (at most 60 characters).
+For each candidate, write two genuinely different reactions. Each branch is played only after that action is selected. Show exactly what the character does, what another character or the setting does in response, and what this changes now. Use a visible consequence. For instance: “猫把第二把钥匙留在柜台。掌柜停下数钱，把纸条翻过来，露出写在背面的时间。” Keep previews to one short line about the choice ahead.
+Treat opening_scene, opening_anchor, history, and last_resolution as continuity. Reuse established people and objects. Let the next scene acknowledge an actual earlier consequence where it matters. Never turn an unchosen option into a past event, jump settings without a transition, or invent a numerical stat or outcome. The engine displays the verified rule results after a choice. Options contain direct effects only, so avoid stating exact totals or guaranteed outcomes in branch narration.
+Follow the current act's task and use its suggested cues when appropriate. In the finale, directly answer the opening question, name the established actions that support that answer, and give one concrete next step. If the rules ended the play early, close the story at that moment.
+Return one JSON object without Markdown. A beat is {"line":"narration","cue":"quiet|warm|tense|reveal"} with one allowed cue. Every line and preview must be non-empty and at most 640 characters. Aim for 2–3 sentences per branch.
+For a nonterminal round return {"opening":{},"branches":[{"card_id":0,"orientation":"UPRIGHT","preview":"short choice preview","accept":beat,"refuse":beat}]}. Include exactly one branch for every supplied option, preserving its card_id and orientation. On the first round fill opening with a beat and its anchor. For a terminal round return {"finale":beat}."""
 
 var _http := HTTPRequest.new()
 var _complete: Callable
@@ -54,6 +56,9 @@ static func configuration_error(profile: Dictionary) -> String:
 
 static func request_data(profile: Dictionary, context: Dictionary) -> Dictionary:
 	var context_data := context.duplicate(true)
+	var act := Skills.brief(context_data["state"], str(context_data.get("last_resolution", {}).get("action", "")))
+	if not act.is_empty():
+		context_data["act"] = act
 	for option: Dictionary in context_data["state"].get("options", []):
 		option["name"] = Loc.card_name(int(option["card_id"]))
 	var user_message := JSON.stringify(context_data)
@@ -82,6 +87,10 @@ static func request_data(profile: Dictionary, context: Dictionary) -> Dictionary
 			}
 		_:
 			suffix = "/chat/completions"
+			if base.ends_with(suffix):
+				suffix = ""
+			elif not base.get_slice("://", 1).contains("/"):
+				suffix = "/v1" + suffix
 			if not key.is_empty():
 				headers.append("Authorization: Bearer " + key)
 			payload = {"model": model, "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_message}]}
@@ -105,11 +114,14 @@ func send(context: Dictionary, profile: Dictionary, complete: Callable) -> void:
 		_finish({}, 0, "", error_string(started))
 
 
-func _receive(result: int, status: int, _headers: PackedStringArray, bytes: PackedByteArray) -> void:
+func _receive(result: int, status: int, headers: PackedStringArray, bytes: PackedByteArray) -> void:
 	var body := bytes.get_string_from_utf8()
 	var raw := body if _secret.is_empty() else body.replace(_secret, "[redacted]")
 	if result != HTTPRequest.RESULT_SUCCESS:
 		_finish({}, status, raw, "Request timed out." if result == HTTPRequest.RESULT_TIMEOUT else "Network error (%d)." % result)
+		return
+	if _is_html(headers, body):
+		_finish({}, status, raw, _html_error())
 		return
 	if status < 200 or status >= 300:
 		_finish({}, status, raw, "API returned HTTP %d." % status)
@@ -128,6 +140,22 @@ func _receive(result: int, status: int, _headers: PackedStringArray, bytes: Pack
 		_finish({}, status, response, "Scene failed validation. Check branch IDs, orientations, beats, and stage cues.")
 	else:
 		_finish(plan, status, response, "")
+
+
+static func _is_html(headers: PackedStringArray, body: String) -> bool:
+	for header: String in headers:
+		if header.to_lower().begins_with("content-type:") and "text/html" in header.to_lower():
+			return true
+	var prefix := body.lstrip("\ufeff \t\r\n").left(32).to_lower()
+	return prefix.begins_with("<!doctype html") or prefix.begins_with("<html")
+
+
+func _html_error() -> String:
+	if _provider == "openai":
+		if Loc.language == "zh":
+			return "收到了 HTML 网页。New API 请使用 OpenAI 兼容协议，基础 URL 填网关地址加 /v1。若仍是网页，请检查反向代理是否将 /v1/chat/completions 转发到 API 服务。"
+		return "Received an HTML page. For New API, use the OpenAI-compatible protocol and the gateway URL ending in /v1. If it still returns a page, check proxy routing for /v1/chat/completions."
+	return "收到了 HTML 网页。请核对请求页签里的 URL，确认它指向模型 API。" if Loc.language == "zh" else "Received an HTML page. Check that the URL in the Request tab points to the model API."
 
 
 func _finish(plan: Dictionary, status: int, raw: String, error: String) -> void:

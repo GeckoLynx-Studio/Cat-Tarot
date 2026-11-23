@@ -79,6 +79,8 @@ func read_profile() -> void:
 	var saved: Dictionary = data.get("run", {})
 	if data.get("version") == 1 and not saved.is_empty():
 		_migrate_run(saved)
+	if not saved.is_empty() and not saved.has("choice_limit"):
+		saved["choice_limit"] = GameManager.TOTAL_CARDS
 	if _valid_run(saved):
 		checkpoint = saved
 
@@ -100,6 +102,8 @@ func _valid_run(run: Dictionary) -> bool:
 		if not run.has(key) or typeof(run[key]) != typeof(GameManager.get(key)):
 			return false
 	if not run.get("rng_state") is int or run.field_cards.size() != 3 or run.revision < 0:
+		return false
+	if run.choice_limit not in [GameManager.STORY_CHOICES, GameManager.TOTAL_CARDS] or run.choices_completed < 0 or run.choices_completed > run.choice_limit:
 		return false
 	if run.die_value < 1 or run.die_value > 6 or run.selected_slot < -1 or run.selected_slot >= 3:
 		return false

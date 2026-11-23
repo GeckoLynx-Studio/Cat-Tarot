@@ -3,6 +3,7 @@ extends Node3D
 const CARD_SCENE := preload("res://scenes/card_3d.tscn")
 const NarrativeCoordinator := preload("res://scripts/narrative_coordinator.gd")
 const NarrativeStage := preload("res://scripts/narrative_stage.gd")
+const NarrativeSkills := preload("res://scripts/narrative_skills.gd")
 const AgentClient := preload("res://scripts/agent_client.gd")
 const CARD_SPACING := 1.95
 const CARD_Y := 0.065
@@ -131,6 +132,7 @@ func _activate_gameplay() -> void:
 		_setting_up_intro_game = true
 		var restored := TheatreSession.restore_game()
 		if restored:
+			opening_question = str(TheatreSession.narrative.get("question", opening_question))
 			_restore_table()
 			_narrative.resume()
 		_setting_up_intro_game = false
@@ -141,7 +143,7 @@ func _activate_gameplay() -> void:
 			return
 	else:
 		_setting_up_intro_game = true
-		GameManager.new_game(_seed)
+		GameManager.new_game(_seed, not opening_question.strip_edges().is_empty())
 		_setting_up_intro_game = false
 	if has_handoff:
 		_play_enter_transition(handoff, is_resume)
@@ -836,10 +838,13 @@ func _refresh_narrative_preview() -> void:
 	if _narrative.is_playing():
 		return
 	var line := _narrative.preview_for(GameManager.selected_card) if _can_choose() else ""
-	if not line.is_empty():
+	var heading := ""
+	if _can_choose() and GameManager.choice_limit == GameManager.STORY_CHOICES:
+		heading = NarrativeSkills.heading(GameManager.choices_completed + 1)
+	if not line.is_empty() or not heading.is_empty():
 		_ensure_narrative_stage()
 	if _narrative_stage != null:
-		_narrative_stage.preview(line)
+		_narrative_stage.preview(line, heading)
 
 
 func _on_turn_resolved(result: Dictionary) -> void:
@@ -897,7 +902,7 @@ func _on_restart_pressed() -> void:
 func _restart(seed_value: int) -> void:
 	if GameManager.phase == GameManager.Phase.GAME_OVER and _narrative.is_playing():
 		return
-	GameManager.new_game(seed_value)
+	GameManager.new_game(seed_value, not opening_question.strip_edges().is_empty())
 
 
 func _show_world() -> void:

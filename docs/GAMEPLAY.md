@@ -53,21 +53,47 @@ scripted lines and stage cues. The book resumes the question, the choices alread
 made, and any scene or ending that still needs to play. Use **Close the script**
 to finish an ending.
 
+The opening introduces the setting, characters, and the detail they will return
+to later. Select **Continue** to advance once you have read it. After each
+choice, the narrator describes what happens in the scene. The result below
+shows the card, settled stat changes, and any actual mark effects.
+
+A new play with an opening question has five acts. Each act presents three
+candidates. Only the card resolved by accepting or refusing becomes part of
+the story. Rerolls change the options and their costs. They do not advance the
+act. Crossing a stat boundary can end the story early. After a surviving fifth
+choice, The World announces the answer without offering another choice.
+
+| Act | Agent skill |
+| --- | --- |
+| Opening | Turn the question into a scene, a desire, and one detail to bring back later. |
+| Complication | Put an obstacle in the chosen path and give each response a distinct cost. |
+| Turning point | Reinterpret an established detail and make a different approach possible. |
+| Climax | Test the original desire against the cost of seeing it through. |
+| Resolution | Show the consequence of the fifth choice and recall an earlier detail. The finale answers the opening question from the selected history. |
+
+The game sets the act, candidates, legal cues, and outcome. The Agent receives
+the current writing brief and the selected history along with the rules
+snapshot. Classic plays and existing saves keep their original length.
+
 ### Agent API
 
 Open **Theatre settings → Agent console**. Pick a protocol and fill in its base
 URL and model ID. The default URLs point to the public services, and a compatible
 gateway can supply its own URL. Include the version prefix when the endpoint
-requires one. The game appends `/chat/completions` for OpenAI-compatible APIs,
-`/messages` for Anthropic, and `/models/{model}:generateContent` for Gemini.
+requires one. For New API and other OpenAI-compatible gateways, use the gateway
+address with `/v1`. A bare host defaults to `/v1/chat/completions`, and a full
+`/chat/completions` URL is used as entered. Include any reverse proxy path prefix
+in the URL. The game appends `/messages` for Anthropic and
+`/models/{model}:generateContent` for Gemini.
 
 Enter a key or leave the field blank to use the corresponding `OPENAI_API_KEY`,
 `ANTHROPIC_API_KEY`, or `GEMINI_API_KEY` environment variable. Entered keys stay
 in memory for the session by default. The optional **Remember key** setting
 stores them in plaintext in the local `user://agent_api.cfg` file.
 
-**Send test request** uses the form as entered and validates a sample three-card
-round or finale. The console shows the JSON payload, the response, the HTTP
+**Send test request** uses the form as entered and validates a sample from
+any of the five acts or the finale. The console shows the JSON payload, the response, the HTTP
 status, and the elapsed time. Enable the Agent and save to use the selected
 profile in play. Starting a new play then prompts for a question.
 The configured endpoint receives the question and the story and rule context

@@ -15,6 +15,7 @@ signal choice_requested(kind: String, prompt_key: String, data: Dictionary)
 enum Phase { SETUP, SELECT, RESOLVE, FINAL, GAME_OVER }
 
 const TOTAL_CARDS := 21
+const STORY_CHOICES := 5
 const MAX_MARKS := 5
 const WORLD_ID := 21
 const STAT_KEYS: Array[String] = ["passion", "intuition", "curiosity", "comfort"]
@@ -22,7 +23,7 @@ const ORIENT_UPRIGHT := "UPRIGHT"
 const ORIENT_REVERSED := "REVERSED"
 const CHECKPOINT_FIELDS := [
 	"stats", "die_value", "deck", "field_cards", "selected_slot", "selected_card",
-	"marks", "choices_completed", "refusals_total", "phase", "pending_new_mark",
+	"marks", "choices_completed", "choice_limit", "refusals_total", "phase", "pending_new_mark",
 	"effect_queue", "flow", "flow_new_mark_card", "roll_cost_enabled", "rng_seed",
 	"revision", "game_over_won", "game_over_reason_key", "_pending_resolution",
 ]
@@ -43,6 +44,7 @@ var selected_slot: int = -1
 var selected_card: int = -1
 var marks: Array[Dictionary] = []
 var choices_completed: int = 0
+var choice_limit: int = TOTAL_CARDS
 var refusals_total: int = 0
 var phase: Phase = Phase.SETUP
 var pending_new_mark: Dictionary = {}
@@ -61,7 +63,7 @@ var _pending_resolution: Dictionary = {}
 var _publishing_resolution: bool = false
 
 
-func new_game(seed_value: int = 0) -> void:
+func new_game(seed_value: int = 0, five_act_story: bool = false) -> void:
 	if _publishing_resolution or (phase == Phase.RESOLVE and not _pending_resolution.is_empty() and pending_new_mark.is_empty()):
 		return
 	rng = RandomNumberGenerator.new()
@@ -86,6 +88,7 @@ func new_game(seed_value: int = 0) -> void:
 	selected_card = -1
 	marks.clear()
 	choices_completed = 0
+	choice_limit = STORY_CHOICES if five_act_story else TOTAL_CARDS
 	refusals_total = 0
 	phase = Phase.SELECT
 	pending_new_mark.clear()
@@ -652,8 +655,10 @@ func _start_death() -> void:
 func _finish_choice_resolution() -> void:
 	if phase == Phase.GAME_OVER:
 		return
-	# Remove the resolved card and refill from the deck.
-	if selected_slot >= 0 and selected_slot < field_cards.size():
+	# Resolve the final choice without drawing another candidate.
+	if choices_completed >= choice_limit:
+		field_cards = [null, null, null]
+	elif selected_slot >= 0 and selected_slot < field_cards.size():
 		field_cards[selected_slot] = null
 		if not deck.is_empty():
 			field_cards[selected_slot] = _make_runtime(deck.pop_front())
@@ -663,7 +668,7 @@ func _finish_choice_resolution() -> void:
 	flow = ""
 	flow_new_mark_card = -1
 	effect_queue.clear()
-	if choices_completed >= TOTAL_CARDS:
+	if choices_completed >= choice_limit:
 		_enter_final_end()
 		return
 	phase = Phase.SELECT
@@ -730,7 +735,7 @@ func rules_context() -> Dictionary:
 				"accept": data.get("accept", []), "refuse": data.get("refuse", []),
 			})
 	return {
-		"revision": revision, "choices_completed": choices_completed,
+		"revision": revision, "choices_completed": choices_completed, "choice_limit": choice_limit,
 		"stats": stats, "die_value": die_value, "marks": marks,
 		"options": options, "terminal": phase == Phase.GAME_OVER,
 		"won": game_over_won, "reason": game_over_reason_key,

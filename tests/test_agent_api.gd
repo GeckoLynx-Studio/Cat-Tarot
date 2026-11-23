@@ -33,10 +33,10 @@ func _run() -> void:
 	var console: PanelContainer = menu.panel
 	for i in AgentSettings.PROVIDERS.size():
 		console._switch_provider(i)
-		console._endpoint.text = endpoint
+		console._endpoint.text = endpoint.trim_suffix("/v1") if i == 0 else endpoint
 		console._model.text = "fixture-model"
 		console._key.text = TEST_KEY
-		console._fixture.select(i % 2)
+		console._fixture.select(GameManager.STORY_CHOICES if i == 1 else i)
 		console._test()
 		var returned := await _wait_until(func() -> bool: return not console._send.disabled)
 		_check(returned and console._status.text.contains("HTTP 200"), "provider replied to the console")
@@ -44,7 +44,13 @@ func _run() -> void:
 		_check(not console._request.text.contains(TEST_KEY), "request inspector omits authorization")
 
 	console._switch_provider(0)
-	console._endpoint.text = endpoint
+	console._endpoint.text = endpoint + "/chat/completions"
+	console._model.text = "fixture-html"
+	console._key.text = TEST_KEY
+	console._test()
+	await _wait_until(func() -> bool: return not console._send.disabled)
+	_check(console._status.text.contains("HTTP 200") and console._status.text.contains("HTML") and console._status.text.contains("/v1/chat/completions"), "HTML dashboard replies identify the endpoint problem")
+	_check(console._response.text.contains("New API"), "HTML dashboard stays visible in the response inspector")
 	console._model.text = "fixture-rejected"
 	console._key.text = TEST_KEY
 	console._test()
@@ -64,12 +70,14 @@ func _run() -> void:
 	menu._enter_game(false, "What should I do next?")
 	await tree.scene_changed
 	var table := tree.current_scene
+	_check(table._narrative.is_playing(), "the opening gates play while the model is preparing the scene")
 	var played := await _wait_until(func() -> bool:
 		return str(TheatreSession.narrative.get("beat", {}).get("line", "")).contains("Remote fixture")
 	)
 	_check(played and table._narrative_stage != null, "actual gameplay plays the authenticated remote opening")
 	_check(TheatreSession.narrative.get("question") == "What should I do next?", "question survives the menu handoff")
-	_check(_served == 6, "all requests reached the same local HTTP fixture")
+	_check(TheatreSession.narrative.get("opening_anchor") == "a brass key" and table._narrative_stage._continue.visible, "the opening keeps its motif and can be advanced once read")
+	_check(_served == 7, "all requests reached the same local HTTP fixture")
 	TheatreSession.tracking = false
 	for suffix: String in ["", ".bak", ".tmp"]:
 		if FileAccess.file_exists(TheatreSession.profile_path + suffix):
@@ -122,8 +130,13 @@ func _respond(headers: String, payload: Dictionary) -> void:
 		_check(headers.to_lower().contains("authorization: bearer " + TEST_KEY), "compatible bearer header")
 		context = JSON.parse_string(payload["messages"][1]["content"])
 	var plan := Plan.fallback(context)
+	_check(context.has("act") and context["act"]["total"] == 5, "model request contains the current five-act skill")
+	if context["state"]["terminal"]:
+		_check(context["act"]["id"] == "resolution" and context["act"]["task"].contains("opening question"), "finale uses the answer skill")
 	var scene: Dictionary = plan["finale"] if context["state"]["terminal"] else plan["opening"]
 	scene["line"] = "Remote fixture"
+	if not context["state"]["terminal"]:
+		scene["anchor"] = "a brass key"
 	if payload.get("model") == "fixture-invalid":
 		scene["cue"] = "unsupported"
 	var content := JSON.stringify(plan)
@@ -137,7 +150,11 @@ func _respond(headers: String, payload: Dictionary) -> void:
 		status = "401 Unauthorized"
 		reply = {"error": {"message": TEST_KEY}}
 	var bytes := JSON.stringify(reply).to_utf8_buffer()
-	_peer.put_data(("HTTP/1.1 %s\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n" % [status, bytes.size()]).to_utf8_buffer())
+	var content_type := "application/json"
+	if payload.get("model") == "fixture-html":
+		content_type = "text/html; charset=utf-8"
+		bytes = "<!doctype html><html><head><title>New API</title></head></html>".to_utf8_buffer()
+	_peer.put_data(("HTTP/1.1 %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n" % [status, content_type, bytes.size()]).to_utf8_buffer())
 	_peer.put_data(bytes)
 	_peer.disconnect_from_host()
 
