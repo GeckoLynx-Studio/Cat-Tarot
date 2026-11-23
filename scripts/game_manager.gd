@@ -210,7 +210,7 @@ func roll_die() -> void:
 	orientation_rolled.emit(die_value)
 	field_cards_changed.emit(field_cards.duplicate())
 	if roll_cost_enabled:
-		var cost := get_die_cost(die_value)
+		var cost := get_die_cost(cost_value)
 		if _apply_stat_delta(str(cost["plus"]), 1, "roll"):
 			return
 		if _apply_stat_delta(str(cost["minus"]), -1, "roll"):

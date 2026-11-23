@@ -71,18 +71,19 @@ func _ready() -> void:
 	check(slot0_card._prevent_orphan_wrap("Comfort - 1.").contains("-\u00A01"), "sign and number glue with non-breaking space")
 
 	# The die works without selecting anything and updates the whole field.
-	GameManager.debug_force_rolls([4])
+	GameManager.debug_set_die(4)
+	GameManager.debug_force_rolls([1])
 	main._on_die_clicked()
 	await get_tree().create_timer(1.1).timeout
 	check_eq(GameManager.selected_slot, -1, "die clicked with no selection")
-	check_eq(int(GameManager.die_value), 4, "die value applied")
+	check_eq(int(GameManager.die_value), 1, "die value applied")
 	for runtime in GameManager.field_cards:
-		check_eq(int(runtime["last_roll"]), 4, "whole field uses the die")
+		check_eq(int(runtime["last_roll"]), 1, "whole field uses the die")
 		check(str(runtime["orientation"]) in ["UPRIGHT", "REVERSED"], "whole field is oriented")
-	check_eq(int(GameManager.stats["passion"]), 4, "die 4 leaves passion")
-	check_eq(int(GameManager.stats["intuition"]), 4, "die 4 leaves intuition")
-	check_eq(int(GameManager.stats["curiosity"]), 3, "die 4 lowers curiosity")
-	check_eq(int(GameManager.stats["comfort"]), 5, "die 4 raises comfort")
+	check_eq(int(GameManager.stats["passion"]), 4, "displayed face 4 leaves passion")
+	check_eq(int(GameManager.stats["intuition"]), 4, "displayed face 4 leaves intuition")
+	check_eq(int(GameManager.stats["curiosity"]), 3, "displayed face 4 lowers curiosity")
+	check_eq(int(GameManager.stats["comfort"]), 5, "displayed face 4 raises comfort")
 	check(dice._cost_label.text.contains("+ 1"), "die cost label shows the gain")
 	check(dice._cost_label.text.contains("- 1"), "die cost label shows the loss")
 	for card in main._slot_cards:
