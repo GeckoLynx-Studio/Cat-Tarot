@@ -11,8 +11,10 @@ config_version=5
 [application]
 
 config/name="Cat-Tarot"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/splash_screen.tscn"
 config/features=PackedStringArray("4.7")
+boot_splash/bg_color=Color(0.04, 0.05, 0.09, 1)
+boot_splash/show_image=false
 
 [autoload]
 
