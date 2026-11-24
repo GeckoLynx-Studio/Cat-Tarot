@@ -208,7 +208,6 @@ func roll_die() -> void:
 		return
 	var cost_value := die_value
 	_begin_resolution("roll", {})
-	var cost_value := die_value
 	die_value = _roll_d6()
 	_apply_die_to_field()
 	_log(Loc.tf("log.die", [die_value]))
