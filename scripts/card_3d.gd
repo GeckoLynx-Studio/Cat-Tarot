@@ -103,6 +103,9 @@ func set_shadows_enabled(enabled: bool) -> void:
 	front.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if enabled else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
+static var _delta_regex: RegEx
+
+
 func set_effect_text(text: String) -> void:
 	effect_text = text
 	if text == "":
@@ -111,6 +114,7 @@ func set_effect_text(text: String) -> void:
 		return
 	_ensure_effect_display()
 	_effect_label.text = _prevent_orphan_wrap(_replace_stat_words(text))
+	_effect_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	_effect_sprite.visible = true
 
 
@@ -121,7 +125,7 @@ func _ensure_effect_display() -> void:
 	_effect_viewport.size = Vector2i(640, 176)
 	_effect_viewport.transparent_bg = true
 	_effect_viewport.gui_disable_input = true
-	_effect_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_effect_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	add_child(_effect_viewport)
 	_effect_label = RichTextLabel.new()
 	_effect_label.bbcode_enabled = true
@@ -159,11 +163,12 @@ func _replace_stat_words(text: String) -> String:
 
 
 func _format_delta_text(text: String) -> String:
-	var regex := RegEx.new()
-	regex.compile("([+-])([0-9]+)")
+	if _delta_regex == null:
+		_delta_regex = RegEx.new()
+		_delta_regex.compile("([+-])([0-9]+)")
 	var result := ""
 	var last := 0
-	for m in regex.search_all(text):
+	for m in _delta_regex.search_all(text):
 		var start := m.get_start()
 		if start > 0:
 			var previous := text.substr(start - 1, 1)

@@ -150,6 +150,7 @@ func _ready() -> void:
 		ResourceLoader.load_threaded_request(next_scene_path, "PackedScene")
 	if next_scene_path == THEATRE_PATH:
 		TablePreloader.begin_load()
+		TablePreloader.begin_cat_load()
 	layer = 100
 	_build_nodes()
 	_play_intro_sequence()
@@ -302,6 +303,8 @@ func _play_intro_sequence() -> void:
 	_tween.parallel().tween_property(_sub_label, "modulate:a", 1.0, 0.50).set_delay(1.36).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 	# Hold the logo until the incoming scene can be drawn behind it.
+	if next_scene_path == THEATRE_PATH:
+		_tween.tween_callback(TablePreloader.prepare)
 	_tween.tween_interval(0.85)
 	if next_scene_path.is_empty():
 		_tween.tween_property(_root, "modulate:a", 0.0, 0.42).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)

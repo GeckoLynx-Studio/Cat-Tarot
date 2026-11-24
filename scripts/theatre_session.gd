@@ -28,6 +28,10 @@ func begin_enter_transition(kind: String, cam_transform: Transform3D, cam_fov: f
 	}
 
 
+func has_enter_transition() -> bool:
+	return not _enter_transition.is_empty()
+
+
 func consume_enter_transition() -> Dictionary:
 	if _enter_transition.is_empty():
 		return {}
@@ -43,6 +47,10 @@ func begin_return_transition(cam_transform: Transform3D, cam_fov: float, curtain
 		"camera_fov": cam_fov,
 		"curtains": curtains,
 	}
+
+
+func has_return_transition() -> bool:
+	return not _return_transition.is_empty()
 
 
 func consume_return_transition() -> Dictionary:

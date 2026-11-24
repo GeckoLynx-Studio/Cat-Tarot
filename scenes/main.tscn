@@ -14,6 +14,7 @@ script = ExtResource("1_main")
 [node name="TheatreSet" type="Node3D" parent="."]
 script = ExtResource("3_theatre_set")
 cat_scene = ExtResource("4_cat")
+auto_load_cat = false
 build_menu_props = true
 build_menu_hitboxes = false
 

@@ -9,6 +9,7 @@ const QUIT := 4
 const MODELS := "res://assets/models/theatre/"
 const CurtainCloth := preload("res://scripts/curtain_cloth.gd")
 const GalleryCardDisplay := preload("res://scripts/gallery_card_display.gd")
+const BlackCatActor := preload("res://scripts/black_cat_actor.gd")
 const FOIL := preload("res://shaders/theatre_foil.gdshader")
 const BEAM := preload("res://shaders/theatre_beam.gdshader")
 const FINISH := preload("res://shaders/theatre_finish.gdshader")
@@ -33,6 +34,7 @@ const GAMEPLAY_SUN_MAX_DIST := 28.0
 const GAMEPLAY_BEAM_TRANSPARENCY := 0.55
 
 @export var cat_scene: PackedScene
+@export var auto_load_cat: bool = true
 @export var build_menu_props: bool = true
 @export var build_menu_hitboxes: bool = true
 var props: Array[Node3D] = []
@@ -58,6 +60,8 @@ var gallery_deck: Node3D
 var gallery_preview_cards: Array[MeshInstance3D] = []
 var gallery_display: GalleryCardDisplay
 var loose_card: MeshInstance3D
+var cat_anchor: Node3D
+var cat_actor: BlackCatActor
 var prop_hitboxes: Array[Area3D] = []
 var directional_light: DirectionalLight3D
 var light_beam: MeshInstance3D
@@ -129,7 +133,7 @@ func _model(parent: Node3D, key: String, at: Vector3, size: Vector3, angles := V
 	pivot.position = at
 	pivot.scale = size
 	pivot.rotation_degrees = angles
-	var packed := load(MODELS + key + ".glb") as PackedScene
+	var packed := TablePreloader.get_theatre_model(MODELS + key + ".glb")
 	pivot.add_child(packed.instantiate())
 	return pivot
 
@@ -285,8 +289,15 @@ func _stage() -> void:
 	anchor.name = "CatAnchor"
 	anchor.position = Vector3(1.70, .93, .96)
 	stage.add_child(anchor)
+	cat_anchor = anchor
+	cat_actor = null
 	if cat_scene:
-		anchor.add_child(cat_scene.instantiate())
+		var cat := cat_scene.instantiate()
+		if cat is BlackCatActor:
+			var actor := cat as BlackCatActor
+			actor.start_loaded = auto_load_cat and not TheatreSession.has_return_transition()
+			cat_actor = actor
+		anchor.add_child(cat)
 
 
 func _menu_props() -> void:
@@ -419,24 +430,8 @@ func _hit(parent: Node3D, id: int, at: Vector3, size: Vector3, angles := Vector3
 
 
 func _letter(parent: Node3D, words: String, at: Vector3, size: Vector2, color: Color, angles := Vector3.ZERO) -> void:
-	var vp := SubViewport.new()
-	vp.size = Vector2i(960, maxi(72,roundi(960.0*size.y/size.x)))
-	vp.transparent_bg = true
-	vp.disable_3d = true
-	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
-	parent.add_child(vp)
-	var label := Label.new()
-	label.size = Vector2(vp.size)
-	label.text = words
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_override("font", _letter_font)
-	var fit := minf(vp.size.y*.82, vp.size.x*100.0/_letter_font.get_string_size(words,HORIZONTAL_ALIGNMENT_LEFT,-1,100).x*.96)
-	label.add_theme_font_size_override("font_size",maxi(12,int(fit)))
-	label.add_theme_color_override("font_color",color)
-	vp.add_child(label)
 	var m := _mat(Color.WHITE)
-	m.albedo_texture = vp.get_texture()
+	m.albedo_texture = TablePreloader.get_letter_texture(words, size, color, _letter_font)
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -592,6 +587,27 @@ func set_gameplay_lighting(active: bool, animate: bool = true, duration: float =
 
 func disable_menu_hitboxes() -> void:
 	_set_menu_hitboxes_enabled(false)
+
+
+func retire_cat_to_backstage(animate: bool = true) -> void:
+	if is_instance_valid(cat_actor):
+		cat_actor.retire_to_backstage(animate)
+
+
+func summon_cat_from_backstage(animate: bool = true) -> void:
+	if is_instance_valid(cat_actor):
+		cat_actor.summon_from_backstage(animate)
+
+
+func release_cat_immediately() -> void:
+	if is_instance_valid(cat_actor):
+		cat_actor.release_model()
+
+
+func transfer_cat_model_to(other: TheatreSet) -> bool:
+	if not is_instance_valid(cat_actor) or not is_instance_valid(other) or not is_instance_valid(other.cat_actor):
+		return false
+	return cat_actor.transfer_model_to(other.cat_actor)
 
 
 func get_gallery_deck_spawn_position() -> Vector3:

@@ -6,6 +6,7 @@ const HOME_FOV := 31.1
 const NAMES := ["gallery", "start", "continue", "settings", "quit"]
 const CARD_BACK := preload("res://assets/models/theatre/card_back.svg")
 const AgentConsole := preload("res://scripts/agent_console.gd")
+const BlackCatActor := preload("res://scripts/black_cat_actor.gd")
 
 @onready var stage: TheatreSet = $Set
 @onready var camera: Camera3D = $Camera3D
@@ -30,6 +31,7 @@ var last_mouse := Vector2(-10000,-10000)
 var camera_target := AIM
 var camera_home := HOME
 var pointer := Vector2.ZERO
+var _prepare_delay_tween: Tween
 
 
 func _ready() -> void:
@@ -53,8 +55,14 @@ func _ready() -> void:
 		stage.set_gameplay_lighting(true, false)
 		stage.set_gameplay_lighting(false, true, 0.72)
 		stage.play_return_props_animation(0.72)
-		create_tween().tween_callback(TablePreloader.prepare).set_delay(0.72)
+		stage.summon_cat_from_backstage(true)
+		if _prepare_delay_tween != null and _prepare_delay_tween.is_valid():
+			_prepare_delay_tween.kill()
+		_prepare_delay_tween = create_tween()
+		_prepare_delay_tween.tween_callback(TablePreloader.prepare).set_delay(1.35)
 	else:
+		if stage.cat_actor != null and (not stage.cat_actor.is_model_loaded() or stage.cat_actor.state != BlackCatActor.State.SITTING_IDLE):
+			stage.summon_cat_from_backstage(false)
 		TablePreloader.prepare()
 	if screen.get_parent() == null:
 		_build_interface()
@@ -242,6 +250,9 @@ func _enter_game(resume: bool, question: String = "") -> void:
 			_open_question()
 			return
 	transitioning = true
+	if _prepare_delay_tween != null and _prepare_delay_tween.is_valid():
+		_prepare_delay_tween.kill()
+		_prepare_delay_tween = null
 	_close_panel()
 	stage.set_gallery_open(true)
 	TheatreSession.resume_requested = resume
@@ -253,6 +264,7 @@ func _enter_game(resume: bool, question: String = "") -> void:
 	lift.tween_property(self, "camera_home", HOME + Vector3(0.0, 0.20, -0.35), 0.42)
 	lift.tween_property(self, "camera_target", AIM + Vector3(0.0, -0.15, 0.35), 0.42)
 	stage.set_curtains_open(true, true, 0.65)
+	stage.retire_cat_to_backstage(true)
 	var tree := get_tree()
 	await tree.create_timer(.44).timeout
 	if not is_inside_tree():
@@ -261,12 +273,15 @@ func _enter_game(resume: bool, question: String = "") -> void:
 		TablePreloader.prepare()
 		await TablePreloader.preparation_finished
 	await tree.process_frame
+	if not is_inside_tree():
+		return
 	var table := TablePreloader.take_table()
 	if table == null:
 		_restore_menu_after_failed_entry()
 		return
 
 	stage.set_gallery_open(true, false)
+	stage.transfer_cat_model_to(table.get("theatre_set") as TheatreSet)
 	TheatreSession.begin_enter_transition("continue" if resume else "start", camera.global_transform, camera.fov, stage.capture_curtains(), question)
 	TablePreloader.keep_menu(self)
 	if tree.change_scene_to_node(table) != OK:
@@ -286,6 +301,7 @@ func _restore_menu_after_failed_entry() -> void:
 	camera_target = AIM
 	stage.set_gallery_open(false)
 	stage.set_curtains_open(false, true)
+	stage.summon_cat_from_backstage(true)
 	push_error("Could not open the tarot table")
 
 

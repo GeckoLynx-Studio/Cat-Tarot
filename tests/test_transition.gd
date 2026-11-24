@@ -3,6 +3,7 @@ extends Node
 var passed: int = 0
 var failed: int = 0
 var profile: String = ""
+var _saved_agent_enabled: bool = false
 
 
 func _ready() -> void:
@@ -10,6 +11,8 @@ func _ready() -> void:
 
 
 func _run() -> void:
+	_saved_agent_enabled = AgentSettings.enabled
+	AgentSettings.enabled = false
 	profile = "user://test_transition_%d.dat" % OS.get_process_id()
 	TheatreSession.profile_path = profile
 	TheatreSession.tracking = false
@@ -26,6 +29,7 @@ func _run() -> void:
 	Audio.stop_music()
 	TheatreSession.tracking = false
 	TheatreSession.resume_requested = false
+	AgentSettings.enabled = _saved_agent_enabled
 	for suffix in ["", ".bak", ".tmp"]:
 		if FileAccess.file_exists(profile + suffix):
 			DirAccess.remove_absolute(profile + suffix)

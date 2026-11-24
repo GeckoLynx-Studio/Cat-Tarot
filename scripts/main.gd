@@ -5,6 +5,7 @@ const NarrativeCoordinator := preload("res://scripts/narrative_coordinator.gd")
 const NarrativeStage := preload("res://scripts/narrative_stage.gd")
 const NarrativeSkills := preload("res://scripts/narrative_skills.gd")
 const AgentClient := preload("res://scripts/agent_client.gd")
+const BlackCatActor := preload("res://scripts/black_cat_actor.gd")
 const CARD_SPACING := 1.95
 const CARD_Y := 0.065
 const CARD_Z := 0.0
@@ -177,6 +178,7 @@ func _snap_to_gameplay_state() -> void:
 		theatre_set.hide_all_menu_props_immediately()
 		theatre_set.set_curtains_open(true, false)
 		theatre_set.set_gameplay_lighting(true, false)
+		theatre_set.release_cat_immediately()
 
 
 func _make_intro_tween() -> Tween:
@@ -205,6 +207,7 @@ func _stop_intro_tweens() -> void:
 
 
 func _play_enter_transition(handoff: Dictionary, is_resume: bool) -> void:
+	_preload_intro_card_textures()
 	var start_xform: Transform3D = handoff.get("camera_transform", _gameplay_camera_transform())
 	var start_fov: float = float(handoff.get("camera_fov", GAMEPLAY_CAM_FOV))
 	var end_xform := _gameplay_camera_transform()
@@ -219,6 +222,8 @@ func _play_enter_transition(handoff: Dictionary, is_resume: bool) -> void:
 		theatre_set.restore_curtains(handoff.get("curtains", {}))
 		theatre_set.set_gameplay_lighting(false, false)
 		theatre_set.disable_menu_hitboxes()
+		if theatre_set.cat_actor != null and theatre_set.cat_actor.is_model_loaded() and theatre_set.cat_actor.state == BlackCatActor.State.SITTING_IDLE:
+			theatre_set.retire_cat_to_backstage(true)
 	if ui != null and ui.root != null:
 		ui.root.modulate.a = 0.0
 	dice.visible = false
@@ -321,6 +326,7 @@ func _style_dice_cost() -> void:
 		dice._cost_label.add_theme_font_size_override("normal_font_size", 56)
 		dice._cost_label.add_theme_color_override("font_outline_color", Color("#f8eedb"))
 		dice._cost_label.add_theme_constant_override("outline_size", 6)
+	dice.refresh_cost_display()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -342,6 +348,8 @@ func _return_to_menu() -> void:
 	_returning_to_menu = true
 	var curtains := theatre_set.capture_curtains() if theatre_set != null else {}
 	_cancel_intro_immediately()
+	if theatre_set != null:
+		theatre_set.release_cat_immediately()
 	TheatreSession.tracking = false
 	TheatreSession.begin_return_transition(camera.global_transform, camera.fov, curtains)
 	var tree := get_tree()
@@ -457,6 +465,7 @@ func _style_card_labels(card: Card3D) -> void:
 		return
 	if card._effect_viewport != null:
 		card._effect_viewport.size.y = 216
+		card._effect_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	if card._effect_sprite != null:
 		card._effect_sprite.pixel_size = 0.0030
 		card._effect_sprite.position.y = 1.56
@@ -1113,16 +1122,22 @@ func _effect_text(card_id: int, orientation: String) -> String:
 	return str(o_data.get("mark_text_" + Loc.language, o_data.get("mark_text_en", "")))
 
 
+func _preload_intro_card_textures() -> void:
+	for card in GameManager.field_cards:
+		if card != null:
+			TablePreloader.preload_card_texture(int(card["card_id"]))
+	for mark in GameManager.marks:
+		if mark != null:
+			TablePreloader.preload_card_texture(int(mark["card_id"]))
+	if not GameManager.pending_new_mark.is_empty():
+		TablePreloader.preload_card_texture(int(GameManager.pending_new_mark["card_id"]))
+
+
 func _texture_for(card_id: int) -> Texture2D:
 	if _textures.has(card_id):
 		return _textures[card_id]
-	var path := CardDatabase.texture_path(card_id)
-	var texture: Texture2D = null
-	if ResourceLoader.exists(path):
-		var loaded: Resource = load(path)
-		if loaded is Texture2D:
-			texture = loaded
+	var texture := TablePreloader.get_card_texture(card_id)
 	if texture == null:
-		push_warning("Cat-Tarot: missing card texture, using placeholder: " + path)
+		push_warning("Cat-Tarot: missing card texture, using placeholder: " + CardDatabase.texture_path(card_id))
 	_textures[card_id] = texture
 	return texture
