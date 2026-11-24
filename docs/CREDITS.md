@@ -6,6 +6,8 @@ sources; see `assets/LICENSES.md` (travels in the asset bundle). The ambient bac
 original to this project.
 
 The physical theatre menu uses Meshy prop and drapery models supplied by the
-project owner. The backstage image is a crop of the supplied concept art.
-The proscenium, placeholder cat, foil and velvet materials, and desk-bell
-sound were made for this project. Source details travel in `assets/LICENSES.md`.
+project owner, and a rigged domestic cat model from BlendKit (`assets/models/cat/`).
+The backstage image is a crop of the supplied concept art.
+The proscenium, black cat fur shader and skeletal animation builder, foil and velvet
+materials, and desk-bell sound were made for this project. Source details travel in
+`assets/LICENSES.md`.
