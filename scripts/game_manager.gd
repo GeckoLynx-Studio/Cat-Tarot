@@ -206,6 +206,7 @@ func select_slot(slot: int) -> void:
 func roll_die() -> void:
 	if phase != Phase.SELECT or _publishing_resolution:
 		return
+	var cost_value := die_value
 	_begin_resolution("roll", {})
 	var cost_value := die_value
 	die_value = _roll_d6()
