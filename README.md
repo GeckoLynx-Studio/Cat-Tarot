@@ -14,8 +14,7 @@
 
 ![Gameplay screenshot](docs/screenshot.png)
 
-A single-player 3D tarot roguelike built with Godot 4.7. Rules, controls and balance are in
-[`docs/GAMEPLAY.md`](docs/GAMEPLAY.md).
+A single-player 3D tarot roguelike set in a miniature Victorian cat theatre, built with Godot 4.7. Features a physical 3D theatre menu with seamless transitions to the tabletop, a five-act narrative stage, and an optional Agent API console. Rules, controls, and balance are in [`docs/GAMEPLAY.md`](docs/GAMEPLAY.md).
 
 ## Requirements
 
@@ -65,6 +64,11 @@ Tests:
 godot --headless --path . res://tests/rules_test.tscn
 godot --headless --path . res://tests/ui_smoke.tscn
 godot --headless --path . res://tests/interactions_test.tscn
+godot --headless --path . res://tests/theatre_test.tscn
+godot --headless --path . res://tests/tarot_table_test.tscn
+godot --headless --path . res://tests/transition_test.tscn
+godot --headless --path . res://tests/narrative_test.tscn
+godot --headless --path . res://tests/agent_api_test.tscn
 ```
 
 ## Project layout
@@ -78,9 +82,10 @@ Cat-Tarot/
 |   |-- GAMEPLAY.md      rules, controls, balance
 |   `-- screenshot.png   image shown in Overview
 |-- assets/              raw assets (git-ignored; restored from the release)
-|-- scenes/              main, card_3d, deck_3d, dice_3d, restart_button_3d
-|-- scripts/             rules engine, UI, audio, card/dice/deck nodes
-|-- tests/               rules, UI smoke, interactions
+|-- scenes/              main, theatre_menu, card_3d, deck_3d, dice_3d, restart_button_3d, tarot_table_3d, elemental_gauge_3d
+|-- scripts/             rules engine, theatre/transition choreography, narrative, agent console, UI, audio
+|-- shaders/             velvet, foil, beam, finish, curtain, and table velvet shaders
+|-- tests/               rules, UI smoke, interactions, theatre, tarot_table, transition, narrative, agent_api
 |-- tools/               asset tooling (assets.py + *.sh / *.ps1)
 |-- .githooks/           pre-commit / commit-msg / pre-push
 `-- .github/             CI workflow + PR template

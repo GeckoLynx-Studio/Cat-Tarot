@@ -31,6 +31,7 @@ var _spin_tween: Tween
 var _hop_tween: Tween
 var _roll_id: int = 0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _cost_viewport: SubViewport
 var _cost_sprite: Sprite3D
 var _cost_label: RichTextLabel
 
@@ -44,27 +45,32 @@ func _ready() -> void:
 
 
 func _create_cost_label() -> void:
-	var viewport := SubViewport.new()
-	viewport.size = Vector2i(400, 96)
-	viewport.transparent_bg = true
-	viewport.gui_disable_input = true
-	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	add_child(viewport)
+	_cost_viewport = SubViewport.new()
+	_cost_viewport.size = Vector2i(400, 96)
+	_cost_viewport.transparent_bg = true
+	_cost_viewport.gui_disable_input = true
+	_cost_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	add_child(_cost_viewport)
 	_cost_label = RichTextLabel.new()
 	_cost_label.bbcode_enabled = true
 	_cost_label.fit_content = false
 	_cost_label.scroll_active = false
 	_cost_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	UiFonts.apply_richtext_tier(_cost_label, UiFonts.SIZE_DIE_COST)
-	viewport.add_child(_cost_label)
+	_cost_viewport.add_child(_cost_label)
 	_cost_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_cost_sprite = Sprite3D.new()
-	_cost_sprite.texture = viewport.get_texture()
+	_cost_sprite.texture = _cost_viewport.get_texture()
 	_cost_sprite.pixel_size = 0.0030
 	_cost_sprite.position = Vector3(0.36, -0.33, -1.0)
 	_cost_sprite.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
 	_cost_sprite.billboard = BaseMaterial3D.BILLBOARD_DISABLED
 	add_child(_cost_sprite)
+
+
+func refresh_cost_display() -> void:
+	if _cost_viewport != null:
+		_cost_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
 func _update_cost_label(value: int) -> void:
@@ -77,6 +83,7 @@ func _update_cost_label(value: int) -> void:
 		STAT_ICONS[plus_stat],
 		STAT_ICONS[minus_stat],
 	]
+	refresh_cost_display()
 
 
 func roll_to(value: int) -> void:

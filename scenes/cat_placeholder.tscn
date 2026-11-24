@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://gc6ncukom2fq"]
+
+[ext_resource type="Script" uid="uid://ignjuckqh5ae" path="res://scripts/black_cat_actor.gd" id="1_actor"]
+
+[node name="CatPlaceholder" type="Node3D" unique_id=1498899311]
+script = ExtResource("1_actor")
