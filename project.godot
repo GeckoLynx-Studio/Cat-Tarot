@@ -23,7 +23,6 @@ Loc="*res://scripts/loc.gd"
 GameManager="*res://scripts/game_manager.gd"
 TheatreSession="*res://scripts/theatre_session.gd"
 TablePreloader="*res://scripts/table_preloader.gd"
-AgentSettings="*res://scripts/agent_settings.gd"
 
 [display]
 

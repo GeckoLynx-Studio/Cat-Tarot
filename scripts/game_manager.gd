@@ -15,7 +15,6 @@ signal choice_requested(kind: String, prompt_key: String, data: Dictionary)
 enum Phase { SETUP, SELECT, RESOLVE, FINAL, GAME_OVER }
 
 const TOTAL_CARDS := 21
-const STORY_CHOICES := 5
 const MAX_MARKS := 5
 const WORLD_ID := 21
 const STAT_KEYS: Array[String] = ["passion", "intuition", "curiosity", "comfort"]
@@ -63,7 +62,7 @@ var _pending_resolution: Dictionary = {}
 var _publishing_resolution: bool = false
 
 
-func new_game(seed_value: int = 0, five_act_story: bool = false) -> void:
+func new_game(seed_value: int = 0) -> void:
 	if _publishing_resolution or (phase == Phase.RESOLVE and not _pending_resolution.is_empty() and pending_new_mark.is_empty()):
 		return
 	rng = RandomNumberGenerator.new()
@@ -88,7 +87,7 @@ func new_game(seed_value: int = 0, five_act_story: bool = false) -> void:
 	selected_card = -1
 	marks.clear()
 	choices_completed = 0
-	choice_limit = STORY_CHOICES if five_act_story else TOTAL_CARDS
+	choice_limit = TOTAL_CARDS
 	refusals_total = 0
 	phase = Phase.SELECT
 	pending_new_mark.clear()

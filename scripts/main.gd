@@ -1,11 +1,8 @@
 extends Node3D
 
 const CARD_SCENE := preload("res://scenes/card_3d.tscn")
-const NarrativeCoordinator := preload("res://scripts/narrative_coordinator.gd")
-const NarrativeStage := preload("res://scripts/narrative_stage.gd")
-const NarrativeSkills := preload("res://scripts/narrative_skills.gd")
-const AgentClient := preload("res://scripts/agent_client.gd")
 const BlackCatActor := preload("res://scripts/black_cat_actor.gd")
+const ReadingPanel := preload("res://scripts/reading_panel.gd")
 const CARD_SPACING := 1.95
 const CARD_Y := 0.065
 const CARD_Z := 0.0
@@ -34,8 +31,6 @@ const CARD_MOVE_TIME := 0.90
 @onready var restart_button: RestartButton3D = $RestartButton3D
 @onready var ui: CanvasLayer = $UI
 
-@export var opening_question: String = ""
-
 var preparing_offscreen: bool = false
 var _visuals_prepared: bool = false
 var _returning_to_menu: bool = false
@@ -58,11 +53,10 @@ var _hand_discarding: bool = false
 var _hand_lift_tween: Tween
 var _roll_pending: bool = false
 var _table_generation: int = 0
-var _narrative: NarrativeCoordinator
-var _narrative_stage: NarrativeStage
 var _intro_active: bool = false
 var _intro_tweens: Array[Tween] = []
 var _setting_up_intro_game: bool = false
+var _reading_panel: ReadingPanel = null
 
 
 func is_intro_active() -> bool:
@@ -91,21 +85,6 @@ func _prepare_visuals() -> void:
 
 
 func _activate_gameplay() -> void:
-	_narrative = NarrativeCoordinator.new()
-	add_child(_narrative)
-	if AgentSettings.enabled:
-		var client := AgentClient.new()
-		add_child(client)
-		var profile := AgentSettings.with_environment_key(AgentSettings.get_profile(AgentSettings.active_provider))
-		_narrative.provider = _request_agent_plan.bind(client, profile)
-		_narrative.provider_cancel = client.cancel
-		_narrative.provider_timeout = AgentClient.TIMEOUT + 1.0
-	_narrative.beat_requested.connect(_play_narrative_beat)
-	_narrative.plan_ready.connect(_refresh_narrative_preview)
-	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--question="):
-			opening_question = arg.trim_prefix("--question=")
-			break
 	GameManager.field_cards_changed.connect(_on_field_cards_changed)
 	GameManager.selected_card_changed.connect(_on_selected_card_changed)
 	GameManager.choice_committed.connect(_on_choice_committed)
@@ -114,15 +93,13 @@ func _activate_gameplay() -> void:
 	GameManager.marks_changed.connect(_on_marks_changed)
 	GameManager.state_changed.connect(_on_state_changed)
 	GameManager.game_started.connect(_on_game_started)
-	GameManager.game_started.connect(_on_narrative_started)
+	GameManager.game_over.connect(_on_game_over)
 	dice.clicked.connect(_on_die_clicked)
 	dice.roll_finished.connect(_on_die_roll_finished)
 	restart_button.pressed.connect(_on_restart_pressed)
 	Loc.language_changed.connect(_on_language_changed)
 	_seed = _read_seed()
 	var handoff := TheatreSession.consume_enter_transition()
-	if not str(handoff.get("question", "")).is_empty():
-		opening_question = handoff["question"]
 	var has_handoff := not handoff.is_empty()
 	var is_resume := TheatreSession.resume_requested
 	if has_handoff:
@@ -133,9 +110,7 @@ func _activate_gameplay() -> void:
 		_setting_up_intro_game = true
 		var restored := TheatreSession.restore_game()
 		if restored:
-			opening_question = str(TheatreSession.narrative.get("question", opening_question))
 			_restore_table()
-			_narrative.resume()
 		_setting_up_intro_game = false
 		if not restored:
 			_intro_active = false
@@ -144,14 +119,10 @@ func _activate_gameplay() -> void:
 			return
 	else:
 		_setting_up_intro_game = true
-		GameManager.new_game(_seed, not opening_question.strip_edges().is_empty())
+		GameManager.new_game(_seed)
 		_setting_up_intro_game = false
 	if has_handoff:
 		_play_enter_transition(handoff, is_resume)
-
-
-func _request_agent_plan(context: Dictionary, complete: Callable, client: AgentClient, profile: Dictionary) -> void:
-	client.send(context, profile, func(reply: Dictionary) -> void: complete.call(reply["plan"]))
 
 
 func _gameplay_camera_transform() -> Transform3D:
@@ -313,7 +284,6 @@ func _finish_intro(is_resume: bool) -> void:
 		_on_state_changed()
 	else:
 		_apply_field_cards(GameManager.field_cards.duplicate())
-	_refresh_narrative_preview()
 
 
 func _style_dice_cost() -> void:
@@ -574,7 +544,6 @@ func _on_card_clicked(card_id: int) -> void:
 
 func _on_selected_card_changed(_card_id: int, _slot: int) -> void:
 	_apply_selection_visual()
-	_refresh_narrative_preview()
 
 
 func _on_card_accept() -> void:
@@ -590,7 +559,7 @@ func _on_card_refuse() -> void:
 func _can_choose() -> bool:
 	return (
 		GameManager.phase == GameManager.Phase.SELECT and not _intro_active and not _returning_to_menu
-		and not _choice_animating and not _roll_pending and not _narrative.is_playing()
+		and not _choice_animating and not _roll_pending
 	)
 
 
@@ -765,7 +734,6 @@ func _refresh_card_actions() -> void:
 
 func _on_orientation_rolled(value: int) -> void:
 	_roll_pending = true
-	_refresh_narrative_preview()
 	for card in _slot_cards:
 		if card != null and is_instance_valid(card):
 			card.hide_actions()
@@ -790,7 +758,6 @@ func _on_die_roll_finished(_value: int) -> void:
 	if any_flip:
 		Audio.play_sfx("card_flip", -4.0)
 	_refresh_card_actions()
-	_refresh_narrative_preview()
 
 
 func _on_die_clicked() -> void:
@@ -819,41 +786,8 @@ func _on_game_started(_seed_value: int) -> void:
 	_hand_discarding = false
 	_field_update_pending = false
 	_pending_field_cards = []
-
-
-func _on_narrative_started(_seed_value: int) -> void:
-	if _narrative_stage != null:
-		_narrative_stage.clear()
-	_narrative.begin(opening_question)
-
-
-func _ensure_narrative_stage() -> void:
-	if _narrative_stage != null:
-		return
-	_narrative_stage = NarrativeStage.new()
-	add_child(_narrative_stage)
-	_narrative_stage.beat_finished.connect(_narrative.finish_beat)
-	_narrative_stage.beat_finished.connect(_refresh_card_actions)
-	_narrative_stage.beat_finished.connect(_refresh_narrative_preview)
-	_narrative_stage.finale_acknowledged.connect(_narrative.acknowledge_finale)
-
-
-func _play_narrative_beat(beat: Dictionary, finale: bool) -> void:
-	_ensure_narrative_stage()
-	_narrative_stage.play(beat, finale)
-
-
-func _refresh_narrative_preview() -> void:
-	if _narrative.is_playing():
-		return
-	var line := _narrative.preview_for(GameManager.selected_card) if _can_choose() else ""
-	var heading := ""
-	if _can_choose() and GameManager.choice_limit == GameManager.STORY_CHOICES:
-		heading = NarrativeSkills.heading(GameManager.choices_completed + 1)
-	if not line.is_empty() or not heading.is_empty():
-		_ensure_narrative_stage()
-	if _narrative_stage != null:
-		_narrative_stage.preview(line, heading)
+	if _reading_panel != null:
+		_reading_panel.hide_reading()
 
 
 func _on_turn_resolved(result: Dictionary) -> void:
@@ -909,9 +843,7 @@ func _on_restart_pressed() -> void:
 
 
 func _restart(seed_value: int) -> void:
-	if GameManager.phase == GameManager.Phase.GAME_OVER and _narrative.is_playing():
-		return
-	GameManager.new_game(seed_value, not opening_question.strip_edges().is_empty())
+	GameManager.new_game(seed_value)
 
 
 func _show_world() -> void:
@@ -947,6 +879,26 @@ func _finish_world_entry(card: Card3D) -> void:
 	card.area.input_ray_pickable = false
 	card.set_world_display()
 	card.set_selected(true)
+	_show_reading()
+
+
+func _on_game_over(reason: String) -> void:
+	if reason == "reason.world_end":
+		return
+	_show_reading()
+
+
+func _show_reading() -> void:
+	var text := TarotReading.compose(GameManager.marks, GameManager.stats, GameManager.game_over_won)
+	_ensure_reading_panel()
+	_reading_panel.show_reading(text)
+
+
+func _ensure_reading_panel() -> void:
+	if _reading_panel != null:
+		return
+	_reading_panel = ReadingPanel.new()
+	add_child(_reading_panel)
 
 
 func _clear_cards() -> void:

@@ -41,65 +41,6 @@ Debug seed:
 godot --path . -- --seed=1234
 ```
 
-To try the narrative prototype, launch with a question and start a new play from a ticket.
-
-```bash
-godot --path . -- "--question=What should I do next?"
-```
-
-Selecting a card shows its story preview. Accepting or refusing plays the chosen
-scene while the next set of branches is prepared. The local prototype uses
-scripted lines and stage cues. The book resumes the question, the choices already
-made, and any scene or ending that still needs to play. Use **Close the script**
-to finish an ending.
-
-The opening introduces the setting, characters, and the detail they will return
-to later. Select **Continue** to advance once you have read it. After each
-choice, the narrator describes what happens in the scene. The result below
-shows the card, settled stat changes, and any actual mark effects.
-
-A new play with an opening question has five acts. Each act presents three
-candidates. Only the card resolved by accepting or refusing becomes part of
-the story. Rerolls change the options and their costs. They do not advance the
-act. Crossing a stat boundary can end the story early. After a surviving fifth
-choice, The World announces the answer without offering another choice.
-
-| Act | Agent skill |
-| --- | --- |
-| Opening | Turn the question into a scene, a desire, and one detail to bring back later. |
-| Complication | Put an obstacle in the chosen path and give each response a distinct cost. |
-| Turning point | Reinterpret an established detail and make a different approach possible. |
-| Climax | Test the original desire against the cost of seeing it through. |
-| Resolution | Show the consequence of the fifth choice and recall an earlier detail. The finale answers the opening question from the selected history. |
-
-The game sets the act, candidates, legal cues, and outcome. The Agent receives
-the current writing brief and the selected history along with the rules
-snapshot. Classic plays and existing saves keep their original length.
-
-### Agent API
-
-Open **Theatre settings → Agent console**. Pick a protocol and fill in its base
-URL and model ID. The default URLs point to the public services, and a compatible
-gateway can supply its own URL. Include the version prefix when the endpoint
-requires one. For New API and other OpenAI-compatible gateways, use the gateway
-address with `/v1`. A bare host defaults to `/v1/chat/completions`, and a full
-`/chat/completions` URL is used as entered. Include any reverse proxy path prefix
-in the URL. The game appends `/messages` for Anthropic and
-`/models/{model}:generateContent` for Gemini.
-
-Enter a key or leave the field blank to use the corresponding `OPENAI_API_KEY`,
-`ANTHROPIC_API_KEY`, or `GEMINI_API_KEY` environment variable. Entered keys stay
-in memory for the session by default. The optional **Remember key** setting
-stores them in plaintext in the local `user://agent_api.cfg` file.
-
-**Send test request** uses the form as entered and validates a sample from
-any of the five acts or the finale. The console shows the JSON payload, the response, the HTTP
-status, and the elapsed time. Enable the Agent and save to use the selected
-profile in play. Starting a new play then prompts for a question.
-The configured endpoint receives the question and the story and rule context
-required for the scene. Gameplay has a local fallback for unavailable or
-invalid responses.
-
 After the studio splash, the theatre opens. Click either ticket to start a play.
 The leather book resumes the last play, including a pending hand replacement.
 Starting from a ticket with a saved play asks before replacing it. Press
@@ -205,8 +146,8 @@ opening cards already show the orientations for that face.
 ### Death
 
 If any stat reaches `<= 0` or `>= 10`, the run ends immediately with the current
-stats and marks. The restart button lights up with a pulsing halo. A narrative
-play also shows a short ending.
+stats and marks. The restart button lights up with a pulsing halo, and the
+end-of-run reading appears.
 
 The d6/pip rolls are seeded. The final-trial missing-mark rule is intentionally
 skipped in this build.
@@ -248,12 +189,35 @@ make any stat `<= 0` or `>= 10`, it is clamped to 1 or 9. A reversed Emperor the
 also applies Intuition -1. The interception does not apply to the final check
 because the final trial is currently skipped.
 
-## Final World
+## Final World and the reading
 
 After 21 choices, The World card is drawn from the deck with the normal draw and
 entry animation, and the draw pile disappears. The tabletop restart button
-lights up with a pulsing halo. In a narrative play, the ending addresses the
-opening question before the player can close the script.
+lights up with a pulsing halo. The run then shows its end-of-run reading.
+
+## The reading
+
+Every run — whether it ends at The World or by crossing a stat boundary — ends
+with a deterministic tarot reading composed from hand-written card meanings.
+No model is called and no text is generated at runtime.
+
+The reading is built from three parts:
+
+- **Balance.** A lead line based on your highest stat, naming which side of the
+  cat's scales the run tipped toward.
+- **Spread.** The marks you accepted, in acquisition order, each paired with a
+  fixed position: 你从哪里来 / 挡在眼前的是什么 / 心底真正想要什么 /
+  你愿意为此付出什么 / 这条路通向哪里 (Where you come from / What stands in
+  your way / What you truly want / What you are willing to pay / Where this road
+  leads). Each entry shows the card's keywords and a one-line meaning for its
+  upright or reversed orientation.
+- **Closing.** A final sentence: a balanced close when the run reaches The
+  World, or the crossed stat named when it ends early.
+
+The per-card keywords and meanings live in `scripts/card_meanings.gd` (bilingual,
+hand-written); `scripts/tarot_reading.gd` assembles them; `scripts/reading_panel.gd`
+presents the result. Variety comes from the combination of card, orientation,
+position, and final stat profile, not from generated prose.
 
 ## Assets and icons
 
@@ -345,7 +309,10 @@ Cat-Tarot/
 |   `-- deck_3d.tscn           22-card draw pile and flip source
 |-- scripts/
 |   |-- card_database.gd       structured 21-card data
+|   |-- card_meanings.gd       bilingual hand-written card keywords + meanings
 |   |-- game_manager.gd        four-stat linear rules engine
+|   |-- tarot_reading.gd       deterministic end-of-run reading composer
+|   |-- reading_panel.gd       modal overlay for the reading
 |   |-- loc.gd                 bilingual UI text
 |   |-- card_3d.gd             texture, hover, selection, reversal, effect/action overlays
 |   |-- dice_3d.gd             d6 face and tumble animation
@@ -402,8 +369,8 @@ Test coverage includes:
 - A card's highest/lowest condition uses fixed stat order for ties.
 - Strength reversed's once-per-run low-stat boost targets the lowest stat with the
   same fixed tie order.
-- The theatre keeps one active play in the local player profile. A narrative
-  ending remains available in the book until the player closes the script.
+- The theatre keeps one active play in the local player profile. A finished run
+  is closed (not resumable); only a run in progress can be resumed from the book.
   The project has no export preset.
 - The card art keeps its printed English titles; localized names are used in the
   remaining UI text.

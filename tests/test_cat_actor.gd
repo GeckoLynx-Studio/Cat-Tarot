@@ -33,7 +33,6 @@ const IK_TOLERANCE := 0.015
 var passed: int = 0
 var failed: int = 0
 var _profile: String = ""
-var _saved_agent_enabled: bool = false
 
 
 func _ready() -> void:
@@ -41,8 +40,6 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	_saved_agent_enabled = AgentSettings.enabled
-	AgentSettings.enabled = false
 	_profile = "user://test_cat_actor_%d.dat" % OS.get_process_id()
 	TheatreSession.profile_path = _profile
 	TheatreSession.tracking = false
@@ -61,7 +58,6 @@ func _run() -> void:
 	TheatreSession.resume_requested = false
 	TheatreSession.consume_enter_transition()
 	TheatreSession.consume_return_transition()
-	AgentSettings.enabled = _saved_agent_enabled
 	for suffix in ["", ".bak", ".tmp"]:
 		if FileAccess.file_exists(_profile + suffix):
 			DirAccess.remove_absolute(_profile + suffix)

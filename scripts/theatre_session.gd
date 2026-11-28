@@ -1,14 +1,12 @@
 extends Node
-## Player profile and the shared rules/narrative checkpoint.
+## Player profile and the shared rules checkpoint.
 
 const PROFILE_PATH := "user://theatre_profile.dat"
-const NarrativePlan := preload("res://scripts/narrative_plan.gd")
 const VERSION := 2
 const BUS_NAMES := ["Music", "SFX"]
 
 var profile_path: String = PROFILE_PATH
 var checkpoint: Dictionary = {}
-var narrative: Dictionary = {}
 var collected: Array[int] = []
 var levels: Array[float] = [db_to_linear(Audio.MUSIC_BUS_DB), db_to_linear(Audio.SFX_BUS_DB)]
 var tracking: bool = false
@@ -17,14 +15,13 @@ var _enter_transition: Dictionary = {}
 var _return_transition: Dictionary = {}
 
 
-func begin_enter_transition(kind: String, cam_transform: Transform3D, cam_fov: float, curtains: Dictionary, question: String = "") -> void:
+func begin_enter_transition(kind: String, cam_transform: Transform3D, cam_fov: float, curtains: Dictionary) -> void:
 	_return_transition.clear()
 	_enter_transition = {
 		"kind": kind,
 		"camera_transform": cam_transform,
 		"camera_fov": cam_fov,
 		"curtains": curtains,
-		"question": question,
 	}
 
 
@@ -64,12 +61,10 @@ func consume_return_transition() -> Dictionary:
 func _ready() -> void:
 	read_profile()
 	GameManager.checkpoint_reached.connect(_on_checkpoint)
-	GameManager.game_started.connect(_on_game_started)
 
 
 func read_profile() -> void:
 	checkpoint.clear()
-	narrative = {}
 	collected.clear()
 	levels.assign([db_to_linear(Audio.MUSIC_BUS_DB), db_to_linear(Audio.SFX_BUS_DB)])
 	var data := _read_file(profile_path)
@@ -111,7 +106,7 @@ func _valid_run(run: Dictionary) -> bool:
 			return false
 	if not run.get("rng_state") is int or run.field_cards.size() != 3 or run.revision < 0:
 		return false
-	if run.choice_limit not in [GameManager.STORY_CHOICES, GameManager.TOTAL_CARDS] or run.choices_completed < 0 or run.choices_completed > run.choice_limit:
+	if run.choice_limit != GameManager.TOTAL_CARDS or run.choices_completed < 0 or run.choices_completed > run.choice_limit:
 		return false
 	if run.die_value < 1 or run.die_value > 6 or run.selected_slot < -1 or run.selected_slot >= 3:
 		return false
@@ -127,40 +122,15 @@ func _valid_run(run: Dictionary) -> bool:
 	for id: Variant in run.deck:
 		if not id is int or id < 0 or id >= GameManager.TOTAL_CARDS:
 			return false
-	if run.marks.size() > GameManager.MAX_MARKS or not run.get("narrative", {}) is Dictionary:
-		return false
-	var story: Dictionary = run.get("narrative", {})
-	if not story.is_empty() and not _valid_narrative(story):
+	if run.marks.size() > GameManager.MAX_MARKS:
 		return false
 	if run.phase == GameManager.Phase.RESOLVE:
 		return _valid_card(run.pending_new_mark) and run.selected_slot >= 0 and run.marks.size() == GameManager.MAX_MARKS and _valid_pending_resolution(run._pending_resolution)
 	if not run.pending_new_mark.is_empty() or not run._pending_resolution.is_empty():
 		return false
 	if run.phase == GameManager.Phase.GAME_OVER:
-		return not story.is_empty() and not story["finale"].is_empty() and run.game_over_reason_key in ["reason.death", "reason.world_end"]
+		return run.game_over_reason_key in ["reason.death", "reason.world_end"]
 	return run.phase == GameManager.Phase.SELECT
-
-
-func _valid_narrative(story: Dictionary) -> bool:
-	if not (
-		story.get("question") is String and not story["question"].is_empty()
-		and story.get("history") is Array and story.get("plan") is Dictionary
-		and story.get("beat") is Dictionary and story.get("finale") is Dictionary
-		and story.get("opened") is bool
-	):
-		return false
-	for key: String in ["beat", "finale"]:
-		if not story[key].is_empty() and not NarrativePlan.is_beat(story[key]):
-			return false
-	var plan: Dictionary = story["plan"]
-	if plan.is_empty():
-		return true
-	if not plan.get("revision") is int or not plan.get("branches") is Array:
-		return false
-	for branch: Variant in plan["branches"]:
-		if not _valid_card(branch) or not NarrativePlan.is_beat(branch.get("accept")) or not NarrativePlan.is_beat(branch.get("refuse")):
-			return false
-	return true
 
 
 func _valid_pending_resolution(result: Dictionary) -> bool:
@@ -220,10 +190,6 @@ func save_checkpoint() -> void:
 	_on_checkpoint()
 
 
-func _on_game_started(_seed: int) -> void:
-	narrative = {}
-
-
 func _on_checkpoint() -> void:
 	if not tracking:
 		return
@@ -233,12 +199,10 @@ func _on_checkpoint() -> void:
 	if GameManager.phase == GameManager.Phase.GAME_OVER:
 		if GameManager.game_over_won and not collected.has(GameManager.WORLD_ID):
 			collected.append(GameManager.WORLD_ID)
-		if narrative.is_empty() or narrative["finale"].is_empty():
-			checkpoint = {}
-			write_profile()
-			return
+		checkpoint = {}
+		write_profile()
+		return
 	checkpoint = GameManager.capture_checkpoint()
-	checkpoint["narrative"] = narrative.duplicate(true)
 	write_profile()
 
 
@@ -246,7 +210,6 @@ func restore_game() -> bool:
 	resume_requested = false
 	if not _valid_run(checkpoint):
 		return false
-	narrative = checkpoint.get("narrative", {}).duplicate(true)
 	GameManager.restore_checkpoint(checkpoint)
 	return true
 

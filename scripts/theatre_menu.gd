@@ -5,7 +5,6 @@ const AIM := Vector3(0, 1.70, 0)
 const HOME_FOV := 31.1
 const NAMES := ["gallery", "start", "continue", "settings", "quit"]
 const CARD_BACK := preload("res://assets/models/theatre/card_back.svg")
-const AgentConsole := preload("res://scripts/agent_console.gd")
 const BlackCatActor := preload("res://scripts/black_cat_actor.gd")
 
 @onready var stage: TheatreSet = $Set
@@ -184,8 +183,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		if mode.is_empty():
 			_activate(TheatreSet.QUIT)
-		elif mode == "agent":
-			_open_settings()
 		else:
 			_close_panel()
 		get_viewport().set_input_as_handled()
@@ -238,17 +235,9 @@ func _activate(id: int) -> void:
 			_confirmation("quit")
 
 
-func _enter_game(resume: bool, question: String = "") -> void:
+func _enter_game(resume: bool) -> void:
 	if transitioning:
 		return
-	if not resume and AgentSettings.enabled and question.is_empty():
-		for arg in OS.get_cmdline_user_args():
-			if arg.begins_with("--question="):
-				question = arg.trim_prefix("--question=").strip_edges()
-				break
-		if question.is_empty():
-			_open_question()
-			return
 	transitioning = true
 	if _prepare_delay_tween != null and _prepare_delay_tween.is_valid():
 		_prepare_delay_tween.kill()
@@ -282,7 +271,7 @@ func _enter_game(resume: bool, question: String = "") -> void:
 
 	stage.set_gallery_open(true, false)
 	stage.transfer_cat_model_to(table.get("theatre_set") as TheatreSet)
-	TheatreSession.begin_enter_transition("continue" if resume else "start", camera.global_transform, camera.fov, stage.capture_curtains(), question)
+	TheatreSession.begin_enter_transition("continue" if resume else "start", camera.global_transform, camera.fov, stage.capture_curtains())
 	TablePreloader.keep_menu(self)
 	if tree.change_scene_to_node(table) != OK:
 		table.queue_free()
@@ -473,45 +462,6 @@ func _open_settings() -> void:
 			slider.grab_focus()
 	var back := _button(row,"back",_close_panel)
 	back.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_button(content, "agent_console", _open_agent_console)
-
-
-func _open_agent_console() -> void:
-	_close_panel()
-	mode = "agent"
-	_set_focus(-1)
-	panel = AgentConsole.new()
-	screen.add_child(panel)
-	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	panel.offset_left = 54.0
-	panel.offset_right = -54.0
-	panel.offset_top = 32.0
-	panel.offset_bottom = -32.0
-	panel.close_requested.connect(_open_settings)
-
-
-func _open_question() -> void:
-	_open_panel("question")
-	_label(content, Loc.t("theatre.ask_question"), 23)
-	var input := LineEdit.new()
-	input.custom_minimum_size.x = 440
-	input.max_length = 240
-	content.add_child(input)
-	var actions := HBoxContainer.new()
-	actions.alignment = BoxContainer.ALIGNMENT_CENTER
-	content.add_child(actions)
-	_button(actions, "back", _close_panel)
-	var start := _button(actions, "start", func() -> void:
-		if not input.text.strip_edges().is_empty():
-			_enter_game(false, input.text.strip_edges())
-	)
-	start.disabled = true
-	input.text_changed.connect(func(value: String) -> void: start.disabled = value.strip_edges().is_empty())
-	input.text_submitted.connect(func(value: String) -> void:
-		if not value.strip_edges().is_empty():
-			_enter_game(false, value.strip_edges())
-	)
-	input.grab_focus()
 
 
 func _show_level(id: int, value: float) -> void:
