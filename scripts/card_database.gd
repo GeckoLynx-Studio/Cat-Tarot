@@ -2685,4 +2685,5 @@ static func orientation_data(id: int, orientation: String) -> Dictionary:
 	if card.is_empty():
 		return {}
 	var orientations: Dictionary = card.get("orientations", {})
-	return orientations.get(orientation, {})
+	var data: Variant = orientations.get(orientation, {})
+	return data if data is Dictionary else {}
